@@ -63,7 +63,7 @@ Why each split exists:
 
 ### Setup
 
-**1. Create `.env` and set a strong SQL Server password.** Use 8 or more characters with uppercase, lowercase, a digit, and a symbol. Avoid `;` because the password goes into a connection string.
+**1. Create `.env` and set a strong SQL Server password.** Use 8 or more characters with uppercase, lowercase, a digit, and a symbol. Avoid `;` because the password goes into a connection string. The same file holds the [seed accounts](#seeding).
 
 ```powershell
 Copy-Item .env.example .env
@@ -95,7 +95,7 @@ dotnet user-secrets set "ConnectionStrings:Default" "Server=127.0.0.1,14333;Data
 dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/TaskTracker.Api
 ```
 
-**4. Restore packages and apply the migrations.** The API also applies migrations when it starts in Development.
+**4. Restore packages and apply the migrations.** The API also applies migrations when it starts in Development, then seeds the accounts and demo data.
 
 ```powershell
 dotnet restore
@@ -130,14 +130,25 @@ dotnet test tests/TaskTracker.Application.Tests
 
 ## 4. Authentication and authorization
 
-### Test accounts
+### Seeding
 
-These are created only in Development. Both use the password `Passw0rd!`.
+Seed values come from `Seed__*` settings in `.env`. Real environment variables override the file. Existing accounts are never changed, so editing a password in `.env` later has no effect on an account that already exists.
 
-| Email | Role | Starts in |
+| Setting | Development | Deployment |
 |---|---|---|
-| `superadmin@tasktracker.local` | SuperAdmin | Organizations page |
-| `admin@tasktracker.local` | Admin of Default Organization and owner of the seeded projects | Projects page |
+| `Seed__SuperAdminEmail`, `Seed__SuperAdminPassword` | Required | Creates the first SuperAdmin if none exists |
+| `Seed__OrganizationName` | Required | Ignored |
+| `Seed__AdminEmail`, `Seed__AdminPassword` | Required | Ignored |
+| Demo projects and tasks | Added when the organization is first created | Never added |
+
+In deployment, `.env` is read from the app folder, and the example password from `.env.example` is refused.
+
+With the values from `.env.example`, the local accounts are:
+
+| Email | Password | Role | Starts in |
+|---|---|---|---|
+| `superadmin@tasktracker.local` | `Passw0rd!` | SuperAdmin | Organizations page |
+| `admin@tasktracker.local` | `Passw0rd!` | Admin of Default Organization and owner of the demo projects | Projects page |
 
 ### JWT flow
 
@@ -252,10 +263,10 @@ No secrets belong in this file:
 |---|---|
 | `Jwt--SigningKey` | `Jwt:SigningKey` |
 | `ConnectionStrings--Default` | `ConnectionStrings:Default` |
-| `Bootstrap--SuperAdminEmail` | `Bootstrap:SuperAdminEmail` |
-| `Bootstrap--SuperAdminPassword` | `Bootstrap:SuperAdminPassword` |
+| `Seed--SuperAdminEmail` | `Seed:SuperAdminEmail` |
+| `Seed--SuperAdminPassword` | `Seed:SuperAdminPassword` |
 
-The bootstrap values create the first SuperAdmin only if none exists. Outside Development, migrations do not run at startup and must be a deployment step.
+The seed values create the first SuperAdmin only if none exists, and nothing else is seeded. Outside Development, migrations do not run at startup and must be a deployment step.
 
 ### Key Vault setup
 

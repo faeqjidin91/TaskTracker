@@ -146,24 +146,6 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
-                            AccessFailedCount = 0,
-                            ConcurrencyStamp = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
-                            Email = "system@tasktracker.local",
-                            EmailConfirmed = false,
-                            LockoutEnabled = true,
-                            LockoutEnd = new DateTimeOffset(new DateTime(9999, 12, 31, 23, 59, 59, 999, DateTimeKind.Unspecified).AddTicks(9999), new TimeSpan(0, 0, 0, 0, 0)),
-                            NormalizedEmail = "SYSTEM@TASKTRACKER.LOCAL",
-                            NormalizedUserName = "SYSTEM@TASKTRACKER.LOCAL",
-                            PhoneNumberConfirmed = false,
-                            SecurityStamp = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
-                            TwoFactorEnabled = false,
-                            UserName = "system@tasktracker.local"
-                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
@@ -272,15 +254,6 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Organizations", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            IsActive = true,
-                            Name = "Default Organization"
-                        });
                 });
 
             modelBuilder.Entity("TaskTracker.Domain.Entities.OrganizationMember", b =>
@@ -302,14 +275,6 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("OrganizationMembers", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            OrganizationId = 1,
-                            UserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
-                            Role = "Admin"
-                        });
                 });
 
             modelBuilder.Entity("TaskTracker.Domain.Entities.Project", b =>
@@ -345,26 +310,6 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "OwnerUserId");
 
                     b.ToTable("Projects", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Refresh the marketing site with a new design system.",
-                            Name = "Website Redesign",
-                            OrganizationId = 1,
-                            OwnerUserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Second major release of the mobile app.",
-                            Name = "Mobile App v2",
-                            OrganizationId = 1,
-                            OwnerUserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01"
-                        });
                 });
 
             modelBuilder.Entity("TaskTracker.Domain.Entities.ProjectMember", b =>
@@ -441,60 +386,6 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProjectId");
 
                     b.ToTable("Tasks", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            Priority = "Medium",
-                            ProjectId = 1,
-                            Status = "Done",
-                            Title = "Audit existing pages",
-                            UpdatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            DueDateUtc = new DateTime(2026, 12, 15, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Priority = "High",
-                            ProjectId = 1,
-                            Status = "InProgress",
-                            Title = "Build new landing page",
-                            UpdatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            Priority = "Low",
-                            ProjectId = 1,
-                            Status = "Todo",
-                            Title = "Migrate blog content",
-                            UpdatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 4,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            DueDateUtc = new DateTime(2026, 12, 20, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Priority = "Medium",
-                            ProjectId = 2,
-                            Status = "InProgress",
-                            Title = "Design onboarding flow",
-                            UpdatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 5,
-                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
-                            Priority = "High",
-                            ProjectId = 2,
-                            Status = "Todo",
-                            Title = "Add push notifications",
-                            UpdatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("TaskTracker.Infrastructure.Notifications.NotificationLog", b =>

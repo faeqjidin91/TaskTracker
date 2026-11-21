@@ -50,6 +50,8 @@ Never add a reference that breaks this graph.
 - ASP.NET Core Identity stays in Infrastructure, behind `IUserDirectory`.
 - Program.cs stays thin: use extension methods (AddApplication, AddInfrastructure, etc.).
 - No secrets committed. Dev JWT key goes in `dotnet user-secrets`.
+- Seed accounts come from `Seed__*` in `.env`. Deployment seeds only the SuperAdmin. Development also
+  seeds the organization, Admin, and demo projects. Do not add demo data through `HasData`.
 - Notification failures must never fail the main request: catch, log, continue.
 
 ## Working rules

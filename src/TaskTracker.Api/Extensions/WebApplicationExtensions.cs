@@ -1,4 +1,5 @@
 using TaskTracker.Infrastructure.Persistence;
+using TaskTracker.Infrastructure.Persistence.Seed;
 
 namespace TaskTracker.Api.Extensions;
 
@@ -6,18 +7,15 @@ public static class WebApplicationExtensions
 {
     public static async Task InitializeDatabaseAsync(this WebApplication app)
     {
+        var seed = app.Configuration.GetSection(SeedOptions.SectionName).Get<SeedOptions>() ?? new SeedOptions();
+
         if (app.Environment.IsDevelopment())
         {
-            await app.Services.InitializeDevelopmentDatabaseAsync();
+            await app.Services.InitializeDevelopmentDatabaseAsync(seed);
         }
-
-        // Outside Development, the first SuperAdmin comes from secrets and is created only once.
-        var email = app.Configuration["Bootstrap:SuperAdminEmail"];
-        var password = app.Configuration["Bootstrap:SuperAdminPassword"];
-
-        if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrEmpty(password))
+        else
         {
-            await app.Services.BootstrapSuperAdminAsync(email, password);
+            await app.Services.SeedDeploymentAsync(seed);
         }
     }
 

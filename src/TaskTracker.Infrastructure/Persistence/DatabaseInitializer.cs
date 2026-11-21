@@ -6,18 +6,22 @@ namespace TaskTracker.Infrastructure.Persistence;
 
 public static class DatabaseInitializer
 {
-    public static async Task InitializeDevelopmentDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
+    public static async Task InitializeDevelopmentDatabaseAsync(
+        this IServiceProvider services, SeedOptions seed, CancellationToken ct = default)
     {
+        // Fails before migrating, so a missing .env value does not leave a half-prepared database.
+        seed.EnsureValidForDevelopment();
+
         await using var scope = services.CreateAsyncScope();
 
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync(ct);
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDevelopmentAsync(ct);
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDevelopmentAsync(seed, ct);
     }
 
-    public static async Task BootstrapSuperAdminAsync(
-        this IServiceProvider services, string email, string password, CancellationToken ct = default)
+    public static async Task SeedDeploymentAsync(
+        this IServiceProvider services, SeedOptions seed, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().BootstrapSuperAdminAsync(email, password, ct);
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDeploymentAsync(seed, ct);
     }
 }

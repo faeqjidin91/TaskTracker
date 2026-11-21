@@ -2,8 +2,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TaskTracker.Domain.Entities;
-using TaskTracker.Domain.Enums;
-using TaskTracker.Infrastructure.Persistence.Seed;
 
 namespace TaskTracker.Infrastructure.Persistence.Configurations;
 
@@ -28,12 +26,5 @@ public class OrganizationMemberConfiguration : IEntityTypeConfiguration<Organiza
             .WithMany()
             .HasForeignKey(m => m.UserId)
             .OnDelete(DeleteBehavior.NoAction);
-
-        builder.HasData(new OrganizationMember
-        {
-            OrganizationId = SeedIds.DefaultOrganizationId,
-            UserId = SeedIds.SystemUserId,
-            Role = OrganizationRole.Admin
-        });
     }
 }

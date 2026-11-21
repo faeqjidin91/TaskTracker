@@ -5,8 +5,16 @@
                 <Authorizing>
                     <LoadingSpinner />
                 </Authorizing>
-                <NotAuthorized>
-                    <RedirectToLogin />
+                <NotAuthorized Context="authState">
+                    @* Sending a signed-in user to login would redirect straight back here in a loop. *@
+                    @if (authState.User.Identity?.IsAuthenticated == true)
+                    {
+                        <div class="alert alert-warning" role="alert">You do not have permission to view this page.</div>
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
                 </NotAuthorized>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />

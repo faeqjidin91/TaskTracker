@@ -47,6 +47,29 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a01",
+                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a01",
+                            Name = "Viewer",
+                            NormalizedName = "VIEWER"
+                        },
+                        new
+                        {
+                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a02",
+                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a02",
+                            Name = "Member",
+                            NormalizedName = "MEMBER"
+                        },
+                        new
+                        {
+                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a03",
+                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a03",
+                            Name = "Admin",
+                            NormalizedName = "ADMIN"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

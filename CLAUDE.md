@@ -35,8 +35,11 @@ Never add a reference that breaks this graph.
 - Controllers are thin: no DbContext in controllers; they call Application services.
 - All EF calls async with CancellationToken.
 - DTOs are `record` types in Contracts. Never return entities from the API.
-- Errors return RFC 7807 ProblemDetails. Status codes: 200, 201 + Location, 204, 400, 401, 404.
-- GET endpoints are anonymous; POST/PUT/PATCH/DELETE require [Authorize].
+- Errors return RFC 7807 ProblemDetails. Status codes: 200, 201 + Location, 204, 400, 401, 403, 404, 409.
+- Project and task GET endpoints are anonymous. User endpoints and `/api/auth/me` always require auth.
+- POST/PUT/PATCH/DELETE require a named policy from `Policies`, except login and change-password.
+- Roles are global, one per user: Admin (everything), Member (manage tasks), Viewer (read only).
+- ASP.NET Core Identity stays in Infrastructure, behind `IUserDirectory`.
 - Program.cs stays thin: use extension methods (AddApplication, AddInfrastructure, etc.).
 - No secrets committed. Dev JWT key goes in `dotnet user-secrets`.
 - Notification failures must never fail the main request: catch, log, continue.

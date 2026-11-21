@@ -1,0 +1,86 @@
+@page "/account"
+@attribute [Authorize]
+@inject AccountApiClient AccountApi
+
+<PageTitle>Account - TaskTracker</PageTitle>
+
+<div class="row">
+    <div class="col-12 col-md-8 col-lg-5">
+        <h1 class="h3 mb-3" tabindex="-1">Change password</h1>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+        @if (_success)
+        {
+            <div class="alert alert-success" role="status">Your password was changed.</div>
+        }
+
+        <EditForm Model="_model" OnValidSubmit="SubmitAsync">
+            <DataAnnotationsValidator />
+
+            <div class="mb-2">
+                <label class="form-label" for="current-password">Current password</label>
+                <InputText id="current-password" type="password" class="form-control" autocomplete="current-password" @bind-Value="_model.CurrentPassword" />
+                <div class="field-message"><ValidationMessage For="() => _model.CurrentPassword" /></div>
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label" for="new-password">New password</label>
+                <InputText id="new-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_model.NewPassword" />
+                <div class="field-message"><ValidationMessage For="() => _model.NewPassword" /></div>
+            </div>
+
+            <div class="mb-2">
+                <label class="form-label" for="confirm-password">Confirm new password</label>
+                <InputText id="confirm-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_model.ConfirmPassword" />
+                <div class="field-message"><ValidationMessage For="() => _model.ConfirmPassword" /></div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@_submitting">
+                @(_submitting ? "Saving..." : "Change password")
+            </button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private ChangePasswordModel _model = new();
+    private string? _error;
+    private bool _success;
+    private bool _submitting;
+
+    private async Task SubmitAsync()
+    {
+        _error = null;
+        _success = false;
+        _submitting = true;
+
+        var result = await AccountApi.ChangePasswordAsync(_model.CurrentPassword, _model.NewPassword);
+
+        _submitting = false;
+        if (result.IsSuccess)
+        {
+            _success = true;
+            _model = new ChangePasswordModel();
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private sealed class ChangePasswordModel
+    {
+        [Required(ErrorMessage = "Current password is required.")]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "New password is required.")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Confirm the new password.")]
+        [Compare(nameof(NewPassword), ErrorMessage = "The passwords do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

@@ -33,7 +33,8 @@ public static class SwaggerExtensions
     {
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            if (context.MethodInfo.GetCustomAttribute<AuthorizeAttribute>() is null)
+            if (context.MethodInfo.GetCustomAttribute<AuthorizeAttribute>() is null
+                && context.MethodInfo.DeclaringType?.GetCustomAttribute<AuthorizeAttribute>() is null)
             {
                 return;
             }

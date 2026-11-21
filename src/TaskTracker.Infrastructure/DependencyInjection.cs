@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
         services.AddIdentityCore<IdentityUser>(options => options.User.RequireUniqueEmail = true)
+            .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppDbContext>();
         services.AddScoped<IdentitySeeder>();
 
@@ -49,5 +50,7 @@ public static class DependencyInjection
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<IUserAuthenticator, IdentityUserAuthenticator>();
+        services.AddScoped<IUserDirectory, IdentityUserDirectory>();
+        services.AddScoped<UserSessionValidator>();
     }
 }

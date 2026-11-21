@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using TaskTracker.Domain.Enums;
 
 namespace TaskTracker.Infrastructure.Persistence.Seed;
 
-// Creates the documented local test user. The Api runs this in Development only.
+// Creates the documented local test user as an Admin. The Api runs this in Development only.
 public class IdentitySeeder(UserManager<IdentityUser> userManager, ILogger<IdentitySeeder> logger)
 {
     private const string TestEmail = "admin@tasktracker.local";
@@ -11,20 +12,28 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, ILogger<Ident
 
     public async Task SeedAsync()
     {
-        if (await userManager.FindByEmailAsync(TestEmail) is not null)
+        var user = await userManager.FindByEmailAsync(TestEmail);
+        if (user is null)
         {
-            return;
+            user = new IdentityUser { UserName = TestEmail, Email = TestEmail, EmailConfirmed = true };
+            EnsureSucceeded(await userManager.CreateAsync(user, TestPassword));
+            logger.LogInformation("Created test user {Email}", TestEmail);
         }
 
-        var user = new IdentityUser { UserName = TestEmail, Email = TestEmail, EmailConfirmed = true };
-        var result = await userManager.CreateAsync(user, TestPassword);
+        // Databases seeded before roles existed already have this user without a role.
+        var admin = nameof(UserRole.Admin);
+        if (!await userManager.IsInRoleAsync(user, admin))
+        {
+            EnsureSucceeded(await userManager.AddToRoleAsync(user, admin));
+        }
+    }
 
+    private static void EnsureSucceeded(IdentityResult result)
+    {
         if (!result.Succeeded)
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new InvalidOperationException($"Could not create test user: {errors}");
+            throw new InvalidOperationException($"Could not seed test user: {errors}");
         }
-
-        logger.LogInformation("Created test user {Email}", TestEmail);
     }
 }

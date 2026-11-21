@@ -10,15 +10,17 @@ public sealed class Result<T>
 
     private readonly T? _value;
 
-    private Result(ResultStatus status, T? value, IReadOnlyDictionary<string, string[]> errors)
+    private Result(ResultStatus status, T? value, IReadOnlyDictionary<string, string[]> errors, string? message = null)
     {
         Status = status;
         _value = value;
         Errors = errors;
+        Message = message;
     }
 
     public ResultStatus Status { get; }
     public IReadOnlyDictionary<string, string[]> Errors { get; }
+    public string? Message { get; }
     public bool IsSuccess => Status == ResultStatus.Success;
 
     public T Value => IsSuccess
@@ -31,6 +33,13 @@ public sealed class Result<T>
 
     public static Result<T> Unauthorized() => new(ResultStatus.Unauthorized, default, NoErrors);
 
+    public static Result<T> Conflict(string message) => new(ResultStatus.Conflict, default, NoErrors, message);
+
     public static Result<T> ValidationFailed(IDictionary<string, string[]> errors) =>
         new(ResultStatus.ValidationFailed, default, new ReadOnlyDictionary<string, string[]>(errors));
+
+    // Carries a failure across to a result of another value type.
+    public Result<TOther> ToFailure<TOther>() => IsSuccess
+        ? throw new InvalidOperationException("Cannot convert a successful result to a failure.")
+        : new Result<TOther>(Status, default, Errors, Message);
 }

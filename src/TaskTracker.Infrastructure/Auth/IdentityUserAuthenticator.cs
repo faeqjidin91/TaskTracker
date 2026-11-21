@@ -3,9 +3,10 @@ using TaskTracker.Application.Abstractions;
 
 namespace TaskTracker.Infrastructure.Auth;
 
-public sealed class IdentityUserAuthenticator(UserManager<IdentityUser> users) : IUserAuthenticator
+public sealed class IdentityUserAuthenticator(UserManager<IdentityUser> users, IUserDirectory directory)
+    : IUserAuthenticator
 {
-    public async Task<AuthenticatedUser?> AuthenticateAsync(string email, string password, CancellationToken ct)
+    public async Task<UserRecord?> AuthenticateAsync(string email, string password, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -15,6 +16,7 @@ public sealed class IdentityUserAuthenticator(UserManager<IdentityUser> users) :
             return null;
         }
 
-        return new AuthenticatedUser(user.Id, user.Email!);
+        var record = await directory.GetByIdAsync(user.Id, ct);
+        return record is { IsActive: true } ? record : null;
     }
 }

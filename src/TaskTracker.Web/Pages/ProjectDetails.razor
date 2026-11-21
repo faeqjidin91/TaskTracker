@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject ProjectApiClient ProjectsApi
 @inject TaskApiClient TasksApi
+@inject IAuthorizationService Authorization
 
 <PageTitle>@(_project?.Name ?? "Project") - TaskTracker</PageTitle>
 
@@ -34,6 +35,8 @@ else
         </div>
     }
 
+    @if (_canManageTasks)
+    {
     <section class="card mb-4">
         <div class="card-body">
             <h2 class="h5 card-title">Add task</h2>
@@ -72,12 +75,13 @@ else
             </EditForm>
         </div>
     </section>
+    }
 
     <h2 class="h5">Tasks</h2>
 
     @if (_tasks.Count == 0)
     {
-        <p class="text-muted">No tasks yet. Add the first one above.</p>
+        <p class="text-muted">No tasks yet.</p>
     }
     else
     {
@@ -89,7 +93,10 @@ else
                         <th scope="col">Priority</th>
                         <th scope="col">Due</th>
                         <th scope="col">Status</th>
-                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        @if (_canManageTasks)
+                        {
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        }
                     </tr>
                 </thead>
                 <tbody>
@@ -106,6 +113,12 @@ else
                             <td><span class="badge @PriorityClass(task.Priority)">@task.Priority</span></td>
                             <td class="text-nowrap">@(task.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-")</td>
                             <td>
+                                @if (!_canManageTasks)
+                                {
+                                    <span class="badge bg-light text-dark border">@StatusLabel(task.Status)</span>
+                                }
+                                else
+                                {
                                 <select class="form-select form-select-sm" aria-label="Status for @task.Title"
                                         value="@task.Status.ToString()" disabled="@_busyTaskIds.Contains(task.Id)"
                                         @onchange="e => ChangeStatusAsync(task, e)">
@@ -114,7 +127,10 @@ else
                                         <option value="@status.ToString()">@StatusLabel(status)</option>
                                     }
                                 </select>
+                                }
                             </td>
+                            @if (_canManageTasks)
+                            {
                             <td class="text-end text-nowrap">
                                 @if (_confirmDeleteId == task.Id)
                                 {
@@ -130,6 +146,7 @@ else
                                             aria-label="Delete @task.Title" @onclick="() => _confirmDeleteId = task.Id">Delete</button>
                                 }
                             </td>
+                            }
                         </tr>
                     }
                 </tbody>
@@ -145,9 +162,13 @@ else
     private NewTaskModel _newTask = new();
     private bool _loading = true;
     private bool _adding;
+    private bool _canManageTasks;
     private int? _confirmDeleteId;
     private string? _loadError;
     private string? _actionError;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
 
     [Parameter]
     public int Id { get; set; }
@@ -159,6 +180,9 @@ else
         _loading = true;
         _loadError = null;
         _actionError = null;
+
+        var state = await AuthenticationState;
+        _canManageTasks = (await Authorization.AuthorizeAsync(state.User, WebPolicies.CanManageTasks)).Succeeded;
 
         var projectTask = ProjectsApi.GetByIdAsync(Id);
         var tasksTask = TasksApi.GetByProjectAsync(Id);

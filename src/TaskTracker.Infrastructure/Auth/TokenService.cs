@@ -10,7 +10,7 @@ public sealed class TokenService(IOptions<JwtOptions> options, TimeProvider time
 {
     private static readonly JsonWebTokenHandler Handler = new();
 
-    public AccessToken CreateToken(string userId, string email)
+    public AccessToken CreateToken(UserRecord user)
     {
         var settings = options.Value;
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -25,9 +25,11 @@ public sealed class TokenService(IOptions<JwtOptions> options, TimeProvider time
             Expires = expiresAtUtc,
             Subject = new ClaimsIdentity(
             [
-                new Claim(JwtRegisteredClaimNames.Sub, userId),
-                new Claim(JwtRegisteredClaimNames.Email, email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(TokenClaims.Role, user.Role.ToString()),
+                new Claim(TokenClaims.SecurityStamp, TokenClaims.HashStamp(user.SecurityStamp))
             ]),
             SigningCredentials = new SigningCredentials(settings.CreateSigningKey(), SecurityAlgorithms.HmacSha256)
         };

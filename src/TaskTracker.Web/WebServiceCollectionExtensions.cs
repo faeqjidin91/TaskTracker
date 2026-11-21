@@ -24,7 +24,7 @@ public static class WebServiceCollectionExtensions
         services.AddSingleton<JwtAuthenticationStateProvider>();
         services.AddSingleton<AuthenticationStateProvider>(
             provider => provider.GetRequiredService<JwtAuthenticationStateProvider>());
-        services.AddAuthorizationCore();
+        services.AddAuthorizationCore(WebPolicies.Configure);
         services.AddTransient<AuthHeaderHandler>();
 
         // Login has no auth handler: a 401 there means a wrong password, not an expired session.
@@ -32,6 +32,10 @@ public static class WebServiceCollectionExtensions
         services.AddHttpClient<ProjectApiClient>(client => client.BaseAddress = apiBaseUri)
             .AddHttpMessageHandler<AuthHeaderHandler>();
         services.AddHttpClient<TaskApiClient>(client => client.BaseAddress = apiBaseUri)
+            .AddHttpMessageHandler<AuthHeaderHandler>();
+        services.AddHttpClient<UserApiClient>(client => client.BaseAddress = apiBaseUri)
+            .AddHttpMessageHandler<AuthHeaderHandler>();
+        services.AddHttpClient<AccountApiClient>(client => client.BaseAddress = apiBaseUri)
             .AddHttpMessageHandler<AuthHeaderHandler>();
 
         return services;

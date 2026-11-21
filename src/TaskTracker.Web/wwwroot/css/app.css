@@ -36,6 +36,11 @@ a, .btn-link {
     color: red;
 }
 
+/* Keeps absolutely positioned screen-reader text inside the scroll area on phones. */
+.table-responsive {
+    position: relative;
+}
+
 /* Reserves a line so the form does not shift, and lose a click, when a message disappears. */
 .field-message {
     min-height: 1.3125rem;

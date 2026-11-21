@@ -11,7 +11,8 @@
         <div class="top-row px-4">
             <AuthorizeView>
                 <Authorized>
-                    <span class="me-3 text-muted" data-testid="user-email">@context.User.Identity?.Name</span>
+                    <a href="account" class="me-2 text-muted" title="Account" data-testid="user-email">@context.User.Identity?.Name</a>
+                    <span class="badge bg-secondary me-3" data-testid="user-role">@context.User.FindFirst("role")?.Value</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LogoutAsync">Logout</button>
                 </Authorized>
             </AuthorizeView>

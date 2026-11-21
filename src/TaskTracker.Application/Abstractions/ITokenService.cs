@@ -4,5 +4,5 @@ public record AccessToken(string Token, DateTime ExpiresAtUtc);
 
 public interface ITokenService
 {
-    AccessToken CreateToken(string userId, string email);
+    AccessToken CreateToken(UserRecord user);
 }

@@ -28,7 +28,11 @@ public sealed class JwtAuthenticationStateProvider(TokenStore tokens) : Authenti
     public async Task SignInAsync(string token, DateTime expiresAtUtc)
     {
         await tokens.SetAsync(token, expiresAtUtc);
-        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+
+        // Notify with a finished task. A pending one makes the router show its "authorizing"
+        // state, which destroys the current page and any message it is displaying.
+        var state = await GetAuthenticationStateAsync();
+        NotifyAuthenticationStateChanged(Task.FromResult(state));
     }
 
     public async Task SignOutAsync()

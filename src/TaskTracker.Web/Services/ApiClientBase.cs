@@ -25,6 +25,9 @@ public abstract class ApiClientBase(HttpClient http)
     protected Task<ApiResult<TResponse>> PostAsync<TRequest, TResponse>(string uri, TRequest body) =>
         SendForValueAsync<TResponse>(() => http.PostAsJsonAsync(uri, body, JsonOptions));
 
+    protected Task<ApiResult> PostNoContentAsync<TRequest>(string uri, TRequest body) =>
+        SendAsync(() => http.PostAsJsonAsync(uri, body, JsonOptions));
+
     protected Task<ApiResult> PatchAsync<TRequest>(string uri, TRequest body) =>
         SendAsync(() => http.PatchAsJsonAsync(uri, body, JsonOptions));
 
@@ -81,9 +84,28 @@ public abstract class ApiClientBase(HttpClient http)
     {
         HttpStatusCode.Unauthorized => UnauthorizedMessage,
         HttpStatusCode.NotFound => "That item was not found. It may have been deleted.",
+        HttpStatusCode.Forbidden => "You do not have permission to do that.",
+        HttpStatusCode.Conflict => await ReadProblemTitleAsync(response),
         HttpStatusCode.BadRequest => await ReadValidationErrorsAsync(response),
         _ => UnexpectedMessage
     };
+
+    private static async Task<string> ReadProblemTitleAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var problem = await JsonDocument.ParseAsync(stream);
+
+            return problem.RootElement.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String
+                ? title.GetString() ?? UnexpectedMessage
+                : UnexpectedMessage;
+        }
+        catch (JsonException)
+        {
+            return UnexpectedMessage;
+        }
+    }
 
     private static async Task<string> ReadValidationErrorsAsync(HttpResponseMessage response)
     {

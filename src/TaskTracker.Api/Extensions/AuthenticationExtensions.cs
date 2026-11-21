@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using TaskTracker.Api.Auth;
 using TaskTracker.Infrastructure.Auth;
 
 namespace TaskTracker.Api.Extensions;
@@ -31,12 +33,30 @@ public static class AuthenticationExtensions
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
                     ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = JwtRegisteredClaimNames.Email
+                    NameClaimType = JwtRegisteredClaimNames.Email,
+                    RoleClaimType = TokenClaims.Role
                 };
+                bearer.Events = new JwtBearerEvents { OnTokenValidated = RejectStaleSessionAsync };
             });
 
-        services.AddAuthorization();
+        services.AddAuthorization(Policies.Configure);
 
         return services;
+    }
+
+    private static async Task RejectStaleSessionAsync(TokenValidatedContext context)
+    {
+        var sessions = context.HttpContext.RequestServices.GetRequiredService<UserSessionValidator>();
+        var user = context.Principal;
+
+        var isCurrent = await sessions.IsCurrentAsync(
+            user?.FindFirstValue(JwtRegisteredClaimNames.Sub),
+            user?.FindFirstValue(TokenClaims.SecurityStamp),
+            context.HttpContext.RequestAborted);
+
+        if (!isCurrent)
+        {
+            context.Fail("The session is no longer valid.");
+        }
     }
 }

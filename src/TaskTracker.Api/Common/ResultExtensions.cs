@@ -45,6 +45,9 @@ public static class ResultExtensions
             case ResultStatus.Unauthorized:
                 return controller.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Invalid email or password.");
 
+            case ResultStatus.Conflict:
+                return controller.Problem(statusCode: StatusCodes.Status409Conflict, title: result.Message);
+
             case ResultStatus.ValidationFailed:
                 var modelState = new ModelStateDictionary();
                 foreach (var (field, messages) in result.Errors)

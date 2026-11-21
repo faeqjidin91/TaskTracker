@@ -3,6 +3,8 @@
   <ItemGroup>
     <!-- Only for DbSet and query operators on IAppDbContext. No provider-specific code. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
   </ItemGroup>
 
   <ItemGroup>

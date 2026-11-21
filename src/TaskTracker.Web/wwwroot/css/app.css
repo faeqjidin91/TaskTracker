@@ -36,6 +36,12 @@ a, .btn-link {
     color: red;
 }
 
+/* Reserves a line so the form does not shift, and lose a click, when a message disappears. */
+.field-message {
+    min-height: 1.3125rem;
+    font-size: 0.875rem;
+}
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;

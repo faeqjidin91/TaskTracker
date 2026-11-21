@@ -1,0 +1,72 @@
+@page "/"
+@page "/projects"
+@attribute [Authorize]
+@inject ProjectApiClient ProjectsApi
+
+<PageTitle>Projects - TaskTracker</PageTitle>
+
+<h1 class="h3 mb-3" tabindex="-1">Projects</h1>
+
+@if (_loading)
+{
+    <LoadingSpinner />
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+        <span>@_error</span>
+        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+else if (_projects.Count == 0)
+{
+    <p class="text-muted">No projects yet.</p>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var project in _projects)
+        {
+            <a @key="project.Id" href="projects/@project.Id"
+               class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
+                <span>
+                    <span class="fw-semibold d-block">@project.Name</span>
+                    @if (!string.IsNullOrWhiteSpace(project.Description))
+                    {
+                        <small class="text-muted">@project.Description</small>
+                    }
+                </span>
+                <span class="badge bg-secondary rounded-pill text-nowrap">
+                    @project.TaskCount @(project.TaskCount == 1 ? "task" : "tasks")
+                </span>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<ProjectDto> _projects = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        var result = await ProjectsApi.GetAllAsync();
+
+        if (result.IsSuccess)
+        {
+            _projects = result.Value;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+
+        _loading = false;
+    }
+}

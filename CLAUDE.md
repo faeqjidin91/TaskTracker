@@ -31,6 +31,7 @@ Never add a reference that breaks this graph.
 
 ## Conventions
 - Entity name is `TaskItem` (never `Task`, it clashes with System.Threading.Tasks.Task).
+- Status enum is `TaskItemStatus` (never `TaskStatus`, it clashes with System.Threading.Tasks.TaskStatus).
 - Controllers are thin: no DbContext in controllers; they call Application services.
 - All EF calls async with CancellationToken.
 - DTOs are `record` types in Contracts. Never return entities from the API.

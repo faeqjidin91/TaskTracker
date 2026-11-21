@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TaskTracker.Application.Abstractions;
+using TaskTracker.Infrastructure.Notifications;
 using TaskTracker.Infrastructure.Persistence;
 using TaskTracker.Infrastructure.Persistence.Seed;
 
@@ -22,6 +23,8 @@ public static class DependencyInjection
         services.AddIdentityCore<IdentityUser>(options => options.User.RequireUniqueEmail = true)
             .AddEntityFrameworkStores<AppDbContext>();
         services.AddScoped<IdentitySeeder>();
+
+        services.AddNotifications(configuration);
 
         return services;
     }

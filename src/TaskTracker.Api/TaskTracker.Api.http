@@ -1,1 +1,60 @@
 @TaskTracker.Api_HostAddress = http://localhost:5182
+
+### Log in with the local test user
+# @name login
+POST {{TaskTracker.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@tasktracker.local",
+  "password": "Passw0rd!"
+}
+
+###
+@token = {{login.response.body.$.accessToken}}
+
+### List projects (anonymous)
+GET {{TaskTracker.Api_HostAddress}}/api/projects
+
+### List tasks in project 1 (anonymous)
+GET {{TaskTracker.Api_HostAddress}}/api/projects/1/tasks
+
+### Create a task without a token (expect 401)
+POST {{TaskTracker.Api_HostAddress}}/api/projects/1/tasks
+Content-Type: application/json
+
+{
+  "title": "This should be rejected",
+  "description": null,
+  "priority": "Low",
+  "dueDateUtc": null
+}
+
+### Create a task (expect 201 + Location)
+# @name createTask
+POST {{TaskTracker.Api_HostAddress}}/api/projects/1/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Write release notes",
+  "description": "Created from the .http file",
+  "priority": "High",
+  "dueDateUtc": "2026-12-31T00:00:00Z"
+}
+
+###
+@taskId = {{createTask.response.body.$.id}}
+
+### Patch the status (expect 204, a log line, and a NotificationLog row)
+PATCH {{TaskTracker.Api_HostAddress}}/api/tasks/{{taskId}}/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "InProgress"
+}
+
+### Delete the task (expect 204)
+DELETE {{TaskTracker.Api_HostAddress}}/api/tasks/{{taskId}}
+Authorization: Bearer {{token}}

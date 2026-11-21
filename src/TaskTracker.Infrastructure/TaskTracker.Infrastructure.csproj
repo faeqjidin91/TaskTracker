@@ -12,6 +12,9 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <!-- Not PrivateAssets: dotnet ef needs Design to flow to the Api startup project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
   </ItemGroup>
 
   <ItemGroup>

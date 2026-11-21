@@ -29,6 +29,8 @@ public sealed class Result<T>
 
     public static Result<T> NotFound() => new(ResultStatus.NotFound, default, NoErrors);
 
+    public static Result<T> Unauthorized() => new(ResultStatus.Unauthorized, default, NoErrors);
+
     public static Result<T> ValidationFailed(IDictionary<string, string[]> errors) =>
         new(ResultStatus.ValidationFailed, default, new ReadOnlyDictionary<string, string[]>(errors));
 }

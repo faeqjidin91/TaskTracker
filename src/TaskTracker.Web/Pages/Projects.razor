@@ -9,12 +9,9 @@
 
 <PageHeader Title="Projects" Subtitle="@(_isAdmin ? "All projects in your organization" : "Projects you own or were added to")">
     <Actions>
-        @if (_isAdmin)
-        {
-            <button type="button" class="btn btn-primary" @onclick="OpenCreate">
-                <Icon Name="plus" /> Create project
-            </button>
-        }
+        <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+            <Icon Name="plus" /> Create project
+        </button>
     </Actions>
 </PageHeader>
 
@@ -89,16 +86,23 @@ else
             <InputText id="project-name" class="form-control" @bind-Value="_newProject.Name" />
             <div class="field-message"><ValidationMessage For="() => _newProject.Name" /></div>
         </div>
-        <div class="mb-3">
-            <label class="form-label" for="project-owner">Owner</label>
-            <InputSelect id="project-owner" class="form-select" @bind-Value="_newProject.OwnerUserId">
-                <option value="">Me</option>
-                @foreach (var user in _owners)
-                {
-                    <option value="@user.Id">@user.Email</option>
-                }
-            </InputSelect>
-        </div>
+        @if (_isAdmin)
+        {
+            <div class="mb-3">
+                <label class="form-label" for="project-owner">Owner</label>
+                <InputSelect id="project-owner" class="form-select" @bind-Value="_newProject.OwnerUserId">
+                    <option value="">Me</option>
+                    @foreach (var user in _owners)
+                    {
+                        <option value="@user.Id">@user.Email</option>
+                    }
+                </InputSelect>
+            </div>
+        }
+        else
+        {
+            <p class="panel-note">You will be the owner of this project and can add members to it.</p>
+        }
         <div class="mb-1">
             <label class="form-label" for="project-description">Description</label>
             <InputTextArea id="project-description" class="form-control" rows="3" @bind-Value="_newProject.Description" />
@@ -145,7 +149,7 @@ else
 
     private string EmptyMessage => _projects.Count > 0
         ? "No projects match these filters."
-        : _isAdmin ? "No projects yet. Create the first one." : "You have not been added to any projects yet.";
+        : "No projects yet. Create your first one.";
 
     protected override async Task OnInitializedAsync()
     {

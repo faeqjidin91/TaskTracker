@@ -165,19 +165,58 @@ else
     </EditForm>
 </Modal>
 
-<ConfirmDialog Open="_toggleTarget is not null"
-               Title="@(_toggleTarget?.IsActive == true ? "Deactivate user" : "Activate user")"
-               Message="@(_toggleTarget?.IsActive == true ? $"Deactivate {_toggleTarget.Email}? They will be signed out immediately." : $"Activate {_toggleTarget?.Email}?")"
-               ConfirmLabel="@(_toggleTarget?.IsActive == true ? "Deactivate" : "Activate")"
-               Danger="@(_toggleTarget?.IsActive == true)"
+<ConfirmDialog Open="_toggleTarget is { IsActive: false }"
+               Title="Activate user"
+               Message="@($"Activate {_toggleTarget?.Email}?")"
+               ConfirmLabel="Activate"
+               Danger="false"
                Busy="_toggling"
                Error="@_toggleError"
                OnConfirm="ToggleActiveAsync"
                OnCancel="() => _toggleTarget = null" />
 
+<Modal Open="_toggleTarget is { IsActive: true }" Title="Deactivate user" Busy="_toggling" OnClose="() => _toggleTarget = null">
+    @if (_toggleError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_toggleError</div>
+    }
+    <p>Deactivate <strong>@_toggleTarget?.Email</strong>? They will be signed out immediately.</p>
+
+    @if (_ownedProjects.Count > 0)
+    {
+        <p class="mb-1">They own @_ownedProjects.Count @(_ownedProjects.Count == 1 ? "project" : "projects"). Choose who takes over:</p>
+        <ul class="owned-projects">
+            @foreach (var project in _ownedProjects)
+            {
+                <li @key="project.Id">@project.Name</li>
+            }
+        </ul>
+        <div class="mb-3">
+            <label class="form-label" for="reassign-owner">New owner</label>
+            <select id="reassign-owner" class="form-select" @bind="_newOwnerId">
+                <option value="">Select a new owner</option>
+                @foreach (var candidate in _users.Where(u => u.IsActive && u.Id != _toggleTarget?.Id))
+                {
+                    <option value="@candidate.Id">@candidate.Email</option>
+                }
+            </select>
+        </div>
+    }
+
+    <div class="modal-actions">
+        <button type="button" class="btn btn-outline-secondary" disabled="@_toggling" @onclick="() => _toggleTarget = null">Cancel</button>
+        <button type="button" class="btn btn-danger" disabled="@(_toggling || (_ownedProjects.Count > 0 && string.IsNullOrEmpty(_newOwnerId)))"
+                @onclick="ToggleActiveAsync">
+            @(_toggling ? "Working..." : _ownedProjects.Count > 0 ? "Reassign and deactivate" : "Deactivate")
+        </button>
+    </div>
+</Modal>
+
 @code {
     private readonly HashSet<string> _busyUserIds = [];
     private List<UserDto> _users = [];
+    private List<OwnedProjectDto> _ownedProjects = [];
+    private string _newOwnerId = string.Empty;
     private NewUserModel _newUser = new();
     private ResetModel _reset = new();
     private UserDto? _resetTarget;
@@ -308,10 +347,28 @@ else
         }
     }
 
-    private void AskToggle(UserDto user)
+    private async Task AskToggle(UserDto user)
     {
         ClearMessages();
         _toggleError = null;
+        _newOwnerId = string.Empty;
+        _ownedProjects = [];
+
+        if (user.IsActive)
+        {
+            _busyUserIds.Add(user.Id);
+            var owned = await UsersApi.GetOwnedProjectsAsync(user.Id);
+            _busyUserIds.Remove(user.Id);
+
+            if (!owned.IsSuccess)
+            {
+                _actionError = owned.Error;
+                return;
+            }
+
+            _ownedProjects = owned.Value;
+        }
+
         _toggleTarget = user;
     }
 
@@ -326,7 +383,8 @@ else
         _toggling = true;
         _busyUserIds.Add(user.Id);
 
-        var result = await UsersApi.UpdateStatusAsync(user.Id, !user.IsActive);
+        var newOwner = user.IsActive && _ownedProjects.Count > 0 ? _newOwnerId : null;
+        var result = await UsersApi.UpdateStatusAsync(user.Id, !user.IsActive, newOwner);
 
         _busyUserIds.Remove(user.Id);
         _toggling = false;

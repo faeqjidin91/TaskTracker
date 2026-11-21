@@ -13,8 +13,11 @@ public sealed class UserApiClient(HttpClient http) : ApiClientBase(http)
     public Task<ApiResult> UpdateRoleAsync(string id, OrganizationRole role) =>
         PatchAsync($"api/users/{id}/role", new UpdateUserRoleRequest(role));
 
-    public Task<ApiResult> UpdateStatusAsync(string id, bool isActive) =>
-        PatchAsync($"api/users/{id}/status", new UpdateUserStatusRequest(isActive));
+    public Task<ApiResult<List<OwnedProjectDto>>> GetOwnedProjectsAsync(string id) =>
+        GetAsync<List<OwnedProjectDto>>($"api/users/{id}/owned-projects");
+
+    public Task<ApiResult> UpdateStatusAsync(string id, bool isActive, string? newOwnerUserId = null) =>
+        PatchAsync($"api/users/{id}/status", new UpdateUserStatusRequest(isActive, newOwnerUserId));
 
     public Task<ApiResult> ResetPasswordAsync(string id, string newPassword) =>
         PostNoContentAsync($"api/users/{id}/reset-password", new ResetPasswordRequest(newPassword));

@@ -36,6 +36,7 @@ public class RequestContractTests
     [Theory]
     [InlineData(typeof(UpdateOrganizationStatusRequest), """{"isActive":false}""")]
     [InlineData(typeof(UpdateUserStatusRequest), """{"isActive":true}""")]
+    [InlineData(typeof(UpdateUserStatusRequest), """{"isActive":false,"newOwnerUserId":"u"}""")]
     [InlineData(typeof(UpdateUserRoleRequest), """{"role":"Admin"}""")]
     [InlineData(typeof(UpdateTaskStatusRequest), """{"status":"Done"}""")]
     [InlineData(typeof(UpdateProjectMemberRequest), """{"role":"Viewer"}""")]

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TaskTracker.Application.Common;
 using TaskTracker.Application.Tests.Support;
 using TaskTracker.Contracts.Users;
@@ -125,6 +126,97 @@ public class UserServiceTests
         var result = await app.UserAdmin.UpdateStatusAsync(TestUsers.AcmeAdmin, Deactivate, Ct);
 
         Assert.Equal(ResultStatus.Conflict, result.Status);
+    }
+
+    [Fact]
+    public async Task GetOwnedProjects_ReturnsTheUsersProjects()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.GetOwnedProjectsAsync(TestUsers.Owner, Ct);
+
+        var project = Assert.Single(result.Value);
+        Assert.Equal(TestApp.AcmeProjectId, project.Id);
+    }
+
+    [Fact]
+    public async Task GetOwnedProjects_OfUserInAnotherOrganization_ReturnsNotFound()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.GetOwnedProjectsAsync(TestUsers.GlobexAdmin, Ct);
+
+        Assert.Equal(ResultStatus.NotFound, result.Status);
+    }
+
+    [Fact]
+    public async Task Deactivate_WithNewOwner_ReassignsProjectsAndDeactivates()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.Owner);
+        var second = await app.Projects.CreateAsync(new Contracts.Projects.CreateProjectRequest("Second", null), Ct);
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.UpdateStatusAsync(
+            TestUsers.Owner, new UpdateUserStatusRequest(false, TestUsers.Contributor), Ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(app.Users.Get(TestUsers.Owner).IsActive);
+        Assert.Equal(TestUsers.Contributor, app.SavedProject(TestApp.AcmeProjectId).OwnerUserId);
+        Assert.Equal(TestUsers.Contributor, app.SavedProject(second.Value.Id).OwnerUserId);
+
+        // The new owner's member row is gone, and the deactivated user is not kept as a member.
+        var memberIds = app.Saved(db => db.ProjectMembers
+            .IgnoreQueryFilters()
+            .Where(m => m.ProjectId == TestApp.AcmeProjectId)
+            .Select(m => m.UserId)
+            .ToList());
+        Assert.Equal([TestUsers.Viewer], memberIds);
+    }
+
+    [Theory]
+    [InlineData(TestUsers.GlobexAdmin)]
+    [InlineData(TestUsers.Owner)]
+    [InlineData("unknown-user")]
+    public async Task Deactivate_WithInvalidNewOwner_ChangesNothing(string newOwnerId)
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.UpdateStatusAsync(
+            TestUsers.Owner, new UpdateUserStatusRequest(false, newOwnerId), Ct);
+
+        Assert.Equal(ResultStatus.ValidationFailed, result.Status);
+        Assert.True(app.Users.Get(TestUsers.Owner).IsActive);
+        Assert.Equal(TestUsers.Owner, app.SavedProject(TestApp.AcmeProjectId).OwnerUserId);
+    }
+
+    [Fact]
+    public async Task Deactivate_WithInactiveNewOwner_ChangesNothing()
+    {
+        using var app = new TestApp();
+        app.Users.Update(TestUsers.Contributor, user => user with { IsActive = false });
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.UpdateStatusAsync(
+            TestUsers.Owner, new UpdateUserStatusRequest(false, TestUsers.Contributor), Ct);
+
+        Assert.Equal(ResultStatus.ValidationFailed, result.Status);
+        Assert.True(app.Users.Get(TestUsers.Owner).IsActive);
+    }
+
+    [Fact]
+    public async Task Deactivate_UserWithoutProjects_NeedsNoNewOwner()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.AcmeAdmin);
+
+        var result = await app.UserAdmin.UpdateStatusAsync(TestUsers.Outsider, Deactivate, Ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(app.Users.Get(TestUsers.Outsider).IsActive);
     }
 
     [Fact]

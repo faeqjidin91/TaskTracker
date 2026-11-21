@@ -885,6 +885,15 @@ dialog.app-modal .modal-body {
     overflow-y: auto;
 }
 
+.owned-projects {
+    max-height: 140px;
+    margin: 0 0 0.9rem;
+    padding-left: 1.2rem;
+    overflow-y: auto;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
 .modal-actions {
     display: flex;
     flex-wrap: wrap;

@@ -36,15 +36,75 @@ public class ProjectServiceTests
         Assert.False(result.Value.Permissions.CanManageMembers);
     }
 
-    [Fact]
-    public async Task Create_ByNonAdmin_IsForbidden()
+    [Theory]
+    [InlineData(TestUsers.Owner)]
+    [InlineData(TestUsers.Contributor)]
+    [InlineData(TestUsers.Viewer)]
+    [InlineData(TestUsers.Outsider)]
+    public async Task Create_ByAnyMember_MakesThemTheOwner(string userId)
     {
         using var app = new TestApp();
-        app.SignInAs(TestUsers.Owner);
+        app.SignInAs(userId);
+
+        var result = await app.Projects.CreateAsync(new CreateProjectRequest("Mine", null), Ct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(userId, result.Value.OwnerUserId);
+        Assert.True(result.Value.Permissions.CanManageMembers);
+        Assert.True(result.Value.Permissions.CanManageTasks);
+        Assert.False(result.Value.Permissions.CanDelete);
+        Assert.Equal(TestApp.AcmeId, app.SavedProject(result.Value.Id).OrganizationId);
+        Assert.Contains((await app.Projects.GetAllAsync(Ct)).Value, project => project.Id == result.Value.Id);
+    }
+
+    [Fact]
+    public async Task Create_ByMemberNamingThemselves_Succeeds()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.Outsider);
+
+        var result = await app.Projects.CreateAsync(new CreateProjectRequest("Mine", null, TestUsers.Outsider), Ct);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData(TestUsers.Contributor)]
+    [InlineData(TestUsers.GlobexAdmin)]
+    public async Task Create_ByMemberNamingAnotherOwner_IsForbidden(string ownerId)
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.Outsider);
+
+        var result = await app.Projects.CreateAsync(new CreateProjectRequest("Theirs", null, ownerId), Ct);
+
+        Assert.Equal(ResultStatus.Forbidden, result.Status);
+        Assert.Empty((await app.Projects.GetAllAsync(Ct)).Value);
+    }
+
+    [Fact]
+    public async Task Create_BySuperAdmin_IsForbidden()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.SuperAdmin);
 
         var result = await app.Projects.CreateAsync(new CreateProjectRequest("New", null), Ct);
 
         Assert.Equal(ResultStatus.Forbidden, result.Status);
+    }
+
+    [Fact]
+    public async Task MemberProject_IsHiddenFromOtherMembersButVisibleToAdmins()
+    {
+        using var app = new TestApp();
+        app.SignInAs(TestUsers.Outsider);
+        var created = await app.Projects.CreateAsync(new CreateProjectRequest("Private", null), Ct);
+
+        app.SignInAs(TestUsers.Viewer);
+        Assert.Equal(ResultStatus.NotFound, (await app.Projects.GetByIdAsync(created.Value.Id, Ct)).Status);
+
+        app.SignInAs(TestUsers.AcmeAdmin);
+        Assert.True((await app.Projects.GetByIdAsync(created.Value.Id, Ct)).IsSuccess);
     }
 
     [Theory]

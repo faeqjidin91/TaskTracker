@@ -42,6 +42,8 @@ Never add a reference that breaks this graph.
 - Hierarchy: Platform -> Organization -> Project -> Task. Each user belongs to one organization.
 - SuperAdmin is the only global role. It manages organizations and cannot read their data.
 - Organization roles: Admin, Member. Project roles: owner (Project.OwnerUserId), Contributor, Viewer.
+- Any organization member can create a project and becomes its owner. Only Admins can name another owner.
+- Only Org Admins manage users. Deactivating a project owner reassigns their projects in one transaction.
 - Only the project owner can assign members. Per-project rules live in `ProjectPermissions`.
 - The organization always comes from the signed-in user, never from the request. EF query filters
   enforce it. Another organization's data returns 404. `IgnoreQueryFilters` stays in Infrastructure.

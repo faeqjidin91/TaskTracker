@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-TaskTracker is a multi-tenant task tracker. A platform SuperAdmin creates organizations, organization Admins create projects, each project has one owner, and only that owner assigns its members.
+TaskTracker is a multi-tenant task tracker. A platform SuperAdmin creates organizations, organization Admins manage users, and any organization member can create a project. Each project has one owner, and only that owner assigns its members.
 
 ```text
 Platform -> Organization -> Project -> Task
@@ -151,11 +151,21 @@ These are created only in Development. Both use the password `Passw0rd!`.
 
 Every endpoint except login requires a token.
 
+Organization-level actions:
+
+| Action | SuperAdmin | Org Admin | Org Member |
+|---|---|---|---|
+| Create or deactivate organizations, add their Admins | Yes | No | No |
+| Manage users in own organization | No | Yes | No |
+| Create a project and become its owner | No | Yes | Yes |
+| Create a project for another owner | No | Yes | No |
+| See every project in the organization | No | Yes | No |
+
+Project-level actions:
+
 | Action | SuperAdmin | Org Admin | Project owner | Contributor | Viewer |
 |---|---|---|---|---|---|
-| Create or deactivate organizations, add their Admins | Yes | No | No | No | No |
-| Manage users in own organization | No | Yes | No | No | No |
-| Create or delete a project | No | Yes | No | No | No |
+| Delete the project | No | Yes | No | No | No |
 | Edit project details | No | Yes | Yes | No | No |
 | Transfer project ownership | No | Yes | Yes | No | No |
 | **Assign project members** | No | No | **Only the owner** | No | No |
@@ -175,7 +185,7 @@ Organization members who are not on a project cannot see it.
 
 - The last active Admin of an organization cannot be demoted or deactivated.
 - Admins cannot change their own role or status.
-- A project owner cannot be deactivated until ownership is transferred.
+- A project owner can only be deactivated by choosing a new owner. The transfer and deactivation happen in one transaction.
 - Deactivating an organization signs out all of its users.
 - Status, role, and priority fields are required, so an empty request body cannot demote or deactivate anything.
 - Two requests changing the same row return 409 rather than a server error.

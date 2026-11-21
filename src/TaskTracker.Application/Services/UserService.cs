@@ -35,6 +35,24 @@ public class UserService(
         return user is null ? Result<UserDto>.NotFound() : Result<UserDto>.Success(user.ToDto());
     }
 
+    public async Task<Result<IReadOnlyList<OwnedProjectDto>>> GetOwnedProjectsAsync(string id, CancellationToken ct)
+    {
+        var user = await users.GetInOrganizationAsync(OrganizationId, id, ct);
+        if (user is null)
+        {
+            return Result<IReadOnlyList<OwnedProjectDto>>.NotFound();
+        }
+
+        var projects = await db.Projects
+            .AsNoTracking()
+            .Where(p => p.OwnerUserId == user.Id)
+            .OrderBy(p => p.Name)
+            .Select(p => new OwnedProjectDto(p.Id, p.Name))
+            .ToListAsync(ct);
+
+        return Result<IReadOnlyList<OwnedProjectDto>>.Success(projects);
+    }
+
     public async Task<Result<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct)
     {
         var validation = await createValidator.ValidateAsync(request, ct);
@@ -118,9 +136,10 @@ public class UserService(
                     return Result<Unit>.Conflict(LastAdminMessage);
                 }
 
-                if (await db.Projects.AnyAsync(p => p.OwnerUserId == user.Id, ct))
+                var reassigned = await ReassignProjectsAsync(user, request.NewOwnerUserId, organizationId, ct);
+                if (!reassigned.IsSuccess)
                 {
-                    return Result<Unit>.Conflict("Transfer this user's projects to a new owner first.");
+                    return reassigned;
                 }
             }
 
@@ -148,6 +167,49 @@ public class UserService(
         }
 
         return ToUnit(await users.ResetPasswordAsync(OrganizationId, user.Id, request.NewPassword, ct));
+    }
+
+    // Runs inside the admin guard transaction, so a failed deactivation also undoes the transfer.
+    private async Task<Result<Unit>> ReassignProjectsAsync(
+        UserRecord user, string? newOwnerUserId, int organizationId, CancellationToken ct)
+    {
+        var owned = await db.Projects
+            .Include(p => p.Members)
+            .Where(p => p.OwnerUserId == user.Id)
+            .ToListAsync(ct);
+
+        if (owned.Count == 0)
+        {
+            return Result<Unit>.Success(Unit.Value);
+        }
+
+        if (string.IsNullOrWhiteSpace(newOwnerUserId))
+        {
+            return Result<Unit>.Conflict("Choose a new owner for this user's projects first.");
+        }
+
+        var newOwner = await users.GetInOrganizationAsync(organizationId, newOwnerUserId, ct);
+        if (newOwner is not { IsActive: true } || newOwner.Id == user.Id)
+        {
+            return Result<Unit>.Invalid(
+                nameof(UpdateUserStatusRequest.NewOwnerUserId),
+                "The new owner must be another active user in this organization.");
+        }
+
+        foreach (var project in owned)
+        {
+            // The new owner's access now comes from ownership, so a member row would be redundant.
+            var existing = project.Members.FirstOrDefault(m => m.UserId == newOwner.Id);
+            if (existing is not null)
+            {
+                db.ProjectMembers.Remove(existing);
+            }
+
+            project.OwnerUserId = newOwner.Id;
+        }
+
+        await db.SaveChangesAsync(ct);
+        return Result<Unit>.Success(Unit.Value);
     }
 
     // Compares the stored id, because SQL Server matches ids case-insensitively in the route.

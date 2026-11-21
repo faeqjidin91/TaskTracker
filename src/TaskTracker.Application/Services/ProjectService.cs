@@ -81,14 +81,19 @@ public class ProjectService(
             return Result<ProjectDto>.ValidationFailed(validation.ToDictionary());
         }
 
-        if (!currentUser.IsOrganizationAdmin
-            || currentUser.OrganizationId is not { } organizationId
-            || currentUser.Id is not { } currentUserId)
+        if (currentUser.OrganizationId is not { } organizationId || currentUser.Id is not { } currentUserId)
         {
             return Result<ProjectDto>.Forbidden();
         }
 
         var ownerId = string.IsNullOrWhiteSpace(request.OwnerUserId) ? currentUserId : request.OwnerUserId;
+
+        // Any member can create a project for themselves. Only Admins can assign it to someone else.
+        if (!currentUser.IsOrganizationAdmin && !string.Equals(ownerId, currentUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            return Result<ProjectDto>.Forbidden();
+        }
+
         Project? project = null;
         string ownerEmail = string.Empty;
 
@@ -120,7 +125,8 @@ public class ProjectService(
             return saved.ToFailure<ProjectDto>();
         }
 
-        var permissions = ProjectPermissions.For(true, project!.OwnerUserId == currentUserId, null)!;
+        var permissions = ProjectPermissions.For(
+            currentUser.IsOrganizationAdmin, project!.OwnerUserId == currentUserId, null)!;
         return Result<ProjectDto>.Success(project.ToDto(taskCount: 0, ownerEmail, permissions));
     }
 

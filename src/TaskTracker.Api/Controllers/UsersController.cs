@@ -25,6 +25,12 @@ public class UsersController(IUserService users) : ControllerBase
     public async Task<ActionResult<UserDto>> GetById(string id, CancellationToken ct) =>
         this.ToOk(await users.GetByIdAsync(id, ct));
 
+    [HttpGet("{id:guid}/owned-projects")]
+    [ProducesResponseType(typeof(IReadOnlyList<OwnedProjectDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<OwnedProjectDto>>> GetOwnedProjects(string id, CancellationToken ct) =>
+        this.ToOk(await users.GetOwnedProjectsAsync(id, ct));
+
     [HttpPost]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -46,6 +52,7 @@ public class UsersController(IUserService users) : ControllerBase
 
     [HttpPatch("{id:guid}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateStatus(string id, UpdateUserStatusRequest request, CancellationToken ct) =>

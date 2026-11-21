@@ -27,7 +27,6 @@ public class ProjectsController(IProjectService projects, ITaskService tasks) : 
         this.ToOk(await projects.GetByIdAsync(id, ct));
 
     [HttpPost]
-    [Authorize(Policy = Policies.OrganizationAdmin)]
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ProjectDto>> Create(CreateProjectRequest request, CancellationToken ct) =>

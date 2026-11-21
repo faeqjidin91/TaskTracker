@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TaskTracker.Domain\TaskTracker.Domain.csproj" />
+    <ProjectReference Include="..\TaskTracker.Contracts\TaskTracker.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

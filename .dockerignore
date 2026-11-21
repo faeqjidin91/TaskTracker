@@ -1,0 +1,20 @@
+# Secrets must never enter the build context.
+.env
+.env.*
+
+.git
+.gitignore
+.gitattributes
+.vs
+.vscode
+.idea
+
+**/bin
+**/obj
+**/*.user
+
+tests
+scripts
+docs
+**/*.md
+docker-compose*.yml

@@ -1,0 +1,34 @@
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Serves the .gz files that Blazor publish already created.
+    gzip_static on;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Cache-Control "no-cache" always;
+
+    # Runtime configuration, filled in from API_BASE_URL when the container starts.
+    location = /appsettings.json {
+        default_type application/json;
+        return 200 '{"ApiBaseUrl":"${API_BASE_URL}"}';
+    }
+
+    # Blazor also requests an environment file, which must not fall back to index.html.
+    location ~ ^/appsettings\..+\.json$ {
+        return 404;
+    }
+
+    location /_framework/ {
+        try_files $uri =404;
+    }
+
+    # Client-side routes such as /projects/1 are handled by the Blazor router.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

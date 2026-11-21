@@ -72,7 +72,7 @@ Copy-Item .env.example .env
 **2. Start SQL Server.** It listens on `127.0.0.1:14333`, so it will not conflict with a local SQL Server on 1433. Wait until the status is `healthy`.
 
 ```powershell
-docker compose up -d
+docker compose up -d sqlserver
 docker compose ps
 ```
 
@@ -127,6 +127,48 @@ To run both from Visual Studio, right-click the solution, choose **Configure Sta
 ```powershell
 dotnet test tests/TaskTracker.Application.Tests
 ```
+
+### Run everything in Docker
+
+This runs SQL Server, the API, and the Web app in containers, with no local .NET SDK needed. Create `.env` and set `MSSQL_SA_PASSWORD` as in step 1, then build and start the stack:
+
+PowerShell:
+
+```powershell
+.\scripts\docker-build.ps1 -Up
+```
+
+Bash:
+
+```bash
+./scripts/docker-build.sh --up
+```
+
+The script builds `tasktracker-api` and `tasktracker-web`, and generates `JWT_SIGNING_KEY` in `.env` if it is empty.
+
+| App | URL |
+|---|---|
+| Web | http://localhost:8090 |
+| API | http://localhost:8091 |
+| Swagger | http://localhost:8091/swagger |
+
+Change the ports with `WEB_PORT` and `API_PORT` in `.env`. Script options:
+
+| PowerShell | Bash | Purpose |
+|---|---|---|
+| `-Framework net8.0` | `--framework net8.0` | Build for .NET 8 instead of .NET 10 |
+| `-Tag v1` | `--tag v1` | Set the image tag |
+| `-NoCache` | `--no-cache` | Rebuild every layer |
+| `-Up` | `--up` | Start the stack after building |
+
+The Compose stack runs in Development, so the API applies migrations and seeds from `.env` when it starts. Useful commands:
+
+```powershell
+docker compose logs -f api
+docker compose down
+```
+
+`docker compose down` keeps the database. Adding `-v` also deletes it.
 
 ## 4. Authentication and authorization
 

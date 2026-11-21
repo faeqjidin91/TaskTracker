@@ -15,6 +15,7 @@ error handling, and README quality. Keep the domain simple; keep the architectur
 - ASP.NET Core Web API with controllers + Swagger (Swashbuckle)
 - ASP.NET Core Identity + JWT bearer auth
 - Blazor WebAssembly (standalone) for the UI
+- Docker: API and Web images are built by `scripts/docker-build`, and run through `docker-compose.yml`
 - FluentValidation for request validation
 - xUnit for tests
 

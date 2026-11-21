@@ -6,11 +6,17 @@ namespace TaskTracker.Infrastructure.Persistence;
 
 public static class DatabaseInitializer
 {
-    public static async Task InitializeDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
+    public static async Task InitializeDevelopmentDatabaseAsync(this IServiceProvider services, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
 
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync(ct);
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync();
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDevelopmentAsync();
+    }
+
+    public static async Task BootstrapSuperAdminAsync(this IServiceProvider services, string email, string password)
+    {
+        await using var scope = services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().BootstrapSuperAdminAsync(email, password);
     }
 }

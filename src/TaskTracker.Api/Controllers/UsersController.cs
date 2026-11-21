@@ -9,7 +9,7 @@ namespace TaskTracker.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-[Authorize(Policy = Policies.CanManageUsers)]
+[Authorize(Policy = Policies.OrganizationAdmin)]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
 public class UsersController(IUserService users) : ControllerBase

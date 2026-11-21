@@ -30,18 +30,18 @@ public class AuthService(
             : Result<LoginResponse>.Success(CreateLoginResponse(user));
     }
 
-    public async Task<Result<UserDto>> GetCurrentUserAsync(CancellationToken ct)
+    public async Task<Result<CurrentUserDto>> GetCurrentUserAsync(CancellationToken ct)
     {
         if (currentUser.Id is not { } id)
         {
-            return Result<UserDto>.Unauthorized();
+            return Result<CurrentUserDto>.Unauthorized();
         }
 
         var user = await users.GetByIdAsync(id, ct);
 
         return user is null
-            ? Result<UserDto>.Unauthorized()
-            : Result<UserDto>.Success(user.ToDto());
+            ? Result<CurrentUserDto>.Unauthorized()
+            : Result<CurrentUserDto>.Success(user.ToCurrentUserDto());
     }
 
     public async Task<Result<LoginResponse>> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct)

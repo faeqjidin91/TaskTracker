@@ -1,8 +1,8 @@
 @page "/projects/{Id:int}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = WebPolicies.InOrganization)]
 @inject ProjectApiClient ProjectsApi
 @inject TaskApiClient TasksApi
-@inject IAuthorizationService Authorization
+@inject NavigationManager Navigation
 
 <PageTitle>@(_project?.Name ?? "Project") - TaskTracker</PageTitle>
 
@@ -33,6 +33,13 @@ else
             @_actionError
             <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _actionError = null"></button>
         </div>
+    }
+
+    <ProjectMembersPanel @key="MembersPanelKey" Project="_project" />
+
+    @if (_project.Permissions.CanEdit || _project.Permissions.CanTransferOwner || _project.Permissions.CanDelete)
+    {
+        <ProjectSettingsPanel @key="SettingsPanelKey" Project="_project" OnChanged="LoadAsync" OnDeleted="OnProjectDeleted" />
     }
 
     @if (_canManageTasks)
@@ -162,16 +169,18 @@ else
     private NewTaskModel _newTask = new();
     private bool _loading = true;
     private bool _adding;
-    private bool _canManageTasks;
     private int? _confirmDeleteId;
     private string? _loadError;
     private string? _actionError;
 
-    [CascadingParameter]
-    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
-
     [Parameter]
     public int Id { get; set; }
+
+    private bool _canManageTasks => _project?.Permissions.CanManageTasks == true;
+
+    // Recreates the panels when ownership changes, because their permissions change with it.
+    private string MembersPanelKey => $"members-{_project?.Id}-{_project?.OwnerUserId}";
+    private string SettingsPanelKey => $"settings-{_project?.Id}-{_project?.OwnerUserId}";
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
@@ -180,9 +189,6 @@ else
         _loading = true;
         _loadError = null;
         _actionError = null;
-
-        var state = await AuthenticationState;
-        _canManageTasks = (await Authorization.AuthorizeAsync(state.User, WebPolicies.CanManageTasks)).Succeeded;
 
         var projectTask = ProjectsApi.GetByIdAsync(Id);
         var tasksTask = TasksApi.GetByProjectAsync(Id);
@@ -205,6 +211,8 @@ else
 
         _loading = false;
     }
+
+    private void OnProjectDeleted() => Navigation.NavigateTo("projects");
 
     private async Task AddTaskAsync()
     {

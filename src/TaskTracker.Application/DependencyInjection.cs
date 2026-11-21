@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using TaskTracker.Application.Authorization;
 using TaskTracker.Application.Services;
 
 namespace TaskTracker.Application;
@@ -12,6 +13,9 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IProjectAccess, ProjectAccess>();
+        services.AddScoped<IOrganizationService, OrganizationService>();
+        services.AddScoped<IProjectMemberService, ProjectMemberService>();
         services.AddScoped<IProjectService, ProjectService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<IUserService, UserService>();

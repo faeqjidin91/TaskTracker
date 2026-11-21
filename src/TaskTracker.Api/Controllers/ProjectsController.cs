@@ -10,6 +10,9 @@ namespace TaskTracker.Api.Controllers;
 
 [ApiController]
 [Route("api/projects")]
+[Authorize(Policy = Policies.InOrganization)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
 public class ProjectsController(IProjectService projects, ITaskService tasks) : ControllerBase
 {
     [HttpGet]
@@ -24,11 +27,9 @@ public class ProjectsController(IProjectService projects, ITaskService tasks) : 
         this.ToOk(await projects.GetByIdAsync(id, ct));
 
     [HttpPost]
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.OrganizationAdmin)]
     [ProducesResponseType(typeof(ProjectDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ProjectDto>> Create(CreateProjectRequest request, CancellationToken ct) =>
         this.ToCreated(
             await projects.CreateAsync(request, ct),
@@ -37,20 +38,14 @@ public class ProjectsController(IProjectService projects, ITaskService tasks) : 
             project => new { id = project.Id });
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = Policies.CanManageProjects)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, UpdateProjectRequest request, CancellationToken ct) =>
         this.ToNoContent(await projects.UpdateAsync(id, request, ct));
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = Policies.CanManageProjects)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct) =>
         this.ToNoContent(await projects.DeleteAsync(id, ct));
@@ -62,11 +57,8 @@ public class ProjectsController(IProjectService projects, ITaskService tasks) : 
         this.ToOk(await tasks.GetByProjectAsync(id, ct));
 
     [HttpPost("{id:int}/tasks")]
-    [Authorize(Policy = Policies.CanManageTasks)]
     [ProducesResponseType(typeof(TaskDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TaskDto>> CreateTask(int id, CreateTaskRequest request, CancellationToken ct) =>
         this.ToCreated(

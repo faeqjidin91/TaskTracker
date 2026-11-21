@@ -11,8 +11,9 @@
         <div class="top-row px-4">
             <AuthorizeView>
                 <Authorized>
-                    <a href="account" class="me-2 text-muted" title="Account" data-testid="user-email">@context.User.Identity?.Name</a>
-                    <span class="badge bg-secondary me-3" data-testid="user-role">@context.User.FindFirst("role")?.Value</span>
+                    <span class="me-2 text-muted d-none d-md-inline" data-testid="user-organization">@context.User.FindFirst("org_name")?.Value</span>
+                    <a href="account" class="me-2 text-muted user-email" title="@context.User.Identity?.Name" data-testid="user-email">@context.User.Identity?.Name</a>
+                    <span class="badge bg-secondary me-3" data-testid="user-role">@(context.User.FindFirst("role")?.Value ?? context.User.FindFirst("org_role")?.Value)</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LogoutAsync">Logout</button>
                 </Authorized>
             </AuthorizeView>

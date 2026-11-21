@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using TaskTracker.Application.Abstractions;
 using TaskTracker.Application.Common;
+using TaskTracker.Domain.Entities;
 using TaskTracker.Domain.Enums;
 using TaskTracker.Infrastructure.Persistence;
+using TaskTracker.Infrastructure.Persistence.Seed;
 
 namespace TaskTracker.Infrastructure.Auth;
 
+// Organization ids are explicit here because SuperAdmins act on organizations they are not in.
 public sealed class IdentityUserDirectory(
     AppDbContext db,
     UserManager<IdentityUser> users,
@@ -14,7 +17,7 @@ public sealed class IdentityUserDirectory(
 {
     private const string DuplicateEmailMessage = "A user with this email already exists.";
 
-    // An app lock serializes admin changes across requests and API instances.
+    // An app lock serializes membership changes across requests and API instances.
     private const string AdminGuardSql =
         """
         DECLARE @result int;
@@ -23,29 +26,64 @@ public sealed class IdentityUserDirectory(
         IF @result < 0 THROW 50001, 'Could not acquire the admin guard lock.', 1;
         """;
 
-    public async Task<IReadOnlyList<UserRecord>> GetAllAsync(CancellationToken ct)
-    {
-        var rows = await QueryRows().OrderBy(u => u.Email).ToListAsync(ct);
-        return rows.Select(ToRecord).ToList();
-    }
-
     public async Task<UserRecord?> GetByIdAsync(string id, CancellationToken ct)
     {
         var row = await QueryRows().Where(u => u.Id == id).FirstOrDefaultAsync(ct);
         return row is null ? null : ToRecord(row);
     }
 
-    public Task<int> CountActiveAdminsAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<UserRecord>> GetInOrganizationAsync(int organizationId, CancellationToken ct)
     {
-        var now = timeProvider.GetUtcNow();
-        var adminRole = nameof(UserRole.Admin);
+        var rows = await QueryRows()
+            .Where(u => u.OrganizationId == organizationId)
+            .OrderBy(u => u.Email)
+            .ToListAsync(ct);
 
-        return QueryRows()
-            .Where(u => u.RoleName == adminRole && (u.LockoutEnd == null || u.LockoutEnd <= now))
-            .CountAsync(ct);
+        return rows.Select(ToRecord).ToList();
     }
 
-    public Task<Result<UserRecord>> CreateAsync(string email, string password, UserRole role, CancellationToken ct) =>
+    public async Task<UserRecord?> GetInOrganizationAsync(int organizationId, string id, CancellationToken ct)
+    {
+        var row = await QueryRows()
+            .Where(u => u.Id == id && u.OrganizationId == organizationId)
+            .FirstOrDefaultAsync(ct);
+
+        return row is null ? null : ToRecord(row);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetEmailsAsync(IEnumerable<string> ids, CancellationToken ct)
+    {
+        var idList = ids.Distinct().ToList();
+
+        return await db.Users
+            .AsNoTracking()
+            .Where(u => idList.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Email ?? string.Empty, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> GetOrganizationUserCountsAsync(CancellationToken ct)
+    {
+        return await db.OrganizationMembers
+            .IgnoreQueryFilters()
+            .Where(m => m.UserId != SeedIds.SystemUserId)
+            .GroupBy(m => m.OrganizationId)
+            .Select(group => new { group.Key, Count = group.Count() })
+            .ToDictionaryAsync(row => row.Key, row => row.Count, ct);
+    }
+
+    public Task<int> CountActiveAdminsAsync(int organizationId, CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow();
+
+        return db.OrganizationMembers
+            .IgnoreQueryFilters()
+            .Where(m => m.OrganizationId == organizationId && m.Role == OrganizationRole.Admin)
+            .Join(db.Users, m => m.UserId, u => u.Id, (m, u) => u)
+            .CountAsync(u => u.LockoutEnd == null || u.LockoutEnd <= now, ct);
+    }
+
+    public Task<Result<UserRecord>> CreateAsync(
+        int organizationId, string email, string password, OrganizationRole role, CancellationToken ct) =>
         InTransactionAsync(async () =>
         {
             var user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
@@ -66,25 +104,27 @@ public sealed class IdentityUserDirectory(
                 return ToFailure(created, passwordField: "Password");
             }
 
-            var added = await users.AddToRoleAsync(user, role.ToString());
-            return added.Succeeded ? await LoadAsync(user.Id, ct) : ToFailure(added, passwordField: "Password");
+            db.OrganizationMembers.Add(new OrganizationMember
+            {
+                OrganizationId = organizationId,
+                UserId = user.Id,
+                Role = role
+            });
+            await db.SaveChangesAsync(ct);
+
+            return await LoadAsync(user.Id, ct);
         }, ct);
 
-    public Task<Result<UserRecord>> SetRoleAsync(string id, UserRole role, CancellationToken ct) =>
-        InTransactionAsync(() => WithUserAsync(id, async user =>
+    public Task<Result<UserRecord>> SetRoleAsync(int organizationId, string id, OrganizationRole role, CancellationToken ct) =>
+        InTransactionAsync(() => WithMemberAsync(organizationId, id, async (user, membership) =>
         {
-            var removed = await users.RemoveFromRolesAsync(user, await users.GetRolesAsync(user));
-            if (!removed.Succeeded)
-            {
-                return removed;
-            }
-
-            var added = await users.AddToRoleAsync(user, role.ToString());
-            return added.Succeeded ? await users.UpdateSecurityStampAsync(user) : added;
+            membership.Role = role;
+            await db.SaveChangesAsync(ct);
+            return await users.UpdateSecurityStampAsync(user);
         }, "Role", ct), ct);
 
-    public Task<Result<UserRecord>> SetActiveAsync(string id, bool isActive, CancellationToken ct) =>
-        InTransactionAsync(() => WithUserAsync(id, async user =>
+    public Task<Result<UserRecord>> SetActiveAsync(int organizationId, string id, bool isActive, CancellationToken ct) =>
+        InTransactionAsync(() => WithMemberAsync(organizationId, id, async (user, _) =>
         {
             var enabled = await users.SetLockoutEnabledAsync(user, true);
             if (!enabled.Succeeded)
@@ -97,21 +137,26 @@ public sealed class IdentityUserDirectory(
             return locked.Succeeded ? await users.UpdateSecurityStampAsync(user) : locked;
         }, "IsActive", ct), ct);
 
-    public Task<Result<UserRecord>> ResetPasswordAsync(string id, string newPassword, CancellationToken ct) =>
+    public Task<Result<UserRecord>> ResetPasswordAsync(int organizationId, string id, string newPassword, CancellationToken ct) =>
         // The transaction restores the old password if the new one fails the strength rules.
-        InTransactionAsync(() => WithUserAsync(id, async user =>
+        InTransactionAsync(() => WithMemberAsync(organizationId, id, async (user, _) =>
         {
             var removed = await users.RemovePasswordAsync(user);
             return removed.Succeeded ? await users.AddPasswordAsync(user, newPassword) : removed;
         }, "NewPassword", ct), ct);
 
-    public Task<Result<UserRecord>> ChangePasswordAsync(
-        string id, string currentPassword, string newPassword, CancellationToken ct) =>
-        WithUserAsync(
-            id,
-            user => users.ChangePasswordAsync(user, currentPassword, newPassword),
-            "NewPassword",
-            ct);
+    public async Task<Result<UserRecord>> ChangePasswordAsync(
+        string id, string currentPassword, string newPassword, CancellationToken ct)
+    {
+        var user = await users.FindByIdAsync(id);
+        if (user is null)
+        {
+            return Result<UserRecord>.NotFound();
+        }
+
+        var result = await users.ChangePasswordAsync(user, currentPassword, newPassword);
+        return result.Succeeded ? await LoadAsync(user.Id, ct) : ToFailure(result, "NewPassword");
+    }
 
     public Task<Result<Unit>> RunWithAdminGuardAsync(Func<Task<Result<Unit>>> action, CancellationToken ct) =>
         InTransactionAsync(async () =>
@@ -120,19 +165,24 @@ public sealed class IdentityUserDirectory(
             return await action();
         }, ct);
 
-    private async Task<Result<UserRecord>> WithUserAsync(
+    private async Task<Result<UserRecord>> WithMemberAsync(
+        int organizationId,
         string id,
-        Func<IdentityUser, Task<IdentityResult>> change,
+        Func<IdentityUser, OrganizationMember, Task<IdentityResult>> change,
         string errorField,
         CancellationToken ct)
     {
-        var user = await users.FindByIdAsync(id);
-        if (user is null)
+        var membership = await db.OrganizationMembers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.OrganizationId == organizationId && m.UserId == id, ct);
+
+        var user = membership is null ? null : await users.FindByIdAsync(membership.UserId);
+        if (membership is null || user is null)
         {
             return Result<UserRecord>.NotFound();
         }
 
-        var result = await change(user);
+        var result = await change(user, membership);
         return result.Succeeded ? await LoadAsync(user.Id, ct) : ToFailure(result, errorField);
     }
 
@@ -164,25 +214,51 @@ public sealed class IdentityUserDirectory(
         return result;
     }
 
-    private IQueryable<UserRow> QueryRows() =>
-        db.Users.AsNoTracking().Select(u => new UserRow
-        {
-            Id = u.Id,
-            Email = u.Email,
-            LockoutEnd = u.LockoutEnd,
-            SecurityStamp = u.SecurityStamp,
-            RoleName = (from userRole in db.UserRoles
-                        join role in db.Roles on userRole.RoleId equals role.Id
-                        where userRole.UserId == u.Id
-                        select role.Name).FirstOrDefault()
-        });
+    private IQueryable<UserRow> QueryRows()
+    {
+        var memberships = db.OrganizationMembers.IgnoreQueryFilters();
+
+        return db.Users
+            .AsNoTracking()
+            .Where(u => u.Id != SeedIds.SystemUserId)
+            .Select(u => new UserRow
+            {
+                Id = u.Id,
+                Email = u.Email,
+                LockoutEnd = u.LockoutEnd,
+                SecurityStamp = u.SecurityStamp,
+                OrganizationId = memberships
+                    .Where(m => m.UserId == u.Id)
+                    .Select(m => (int?)m.OrganizationId)
+                    .FirstOrDefault(),
+                OrganizationName = memberships
+                    .Where(m => m.UserId == u.Id)
+                    .Select(m => m.Organization.Name)
+                    .FirstOrDefault(),
+                OrganizationRole = memberships
+                    .Where(m => m.UserId == u.Id)
+                    .Select(m => (OrganizationRole?)m.Role)
+                    .FirstOrDefault(),
+                OrganizationIsActive = memberships
+                    .Where(m => m.UserId == u.Id)
+                    .Select(m => (bool?)m.Organization.IsActive)
+                    .FirstOrDefault(),
+                IsSuperAdmin = (from userRole in db.UserRoles
+                                join role in db.Roles on userRole.RoleId equals role.Id
+                                where userRole.UserId == u.Id && role.Name == TokenClaims.SuperAdminRole
+                                select role.Id).Any()
+            });
+    }
 
     private UserRecord ToRecord(UserRow row) => new(
         row.Id,
         row.Email ?? string.Empty,
-        // A user without a recognized role gets the least privilege.
-        Enum.TryParse<UserRole>(row.RoleName, out var role) ? role : UserRole.Viewer,
+        row.OrganizationId,
+        row.OrganizationName,
+        row.OrganizationRole,
+        row.IsSuperAdmin,
         row.LockoutEnd is null || row.LockoutEnd <= timeProvider.GetUtcNow(),
+        row.OrganizationIsActive == true,
         row.SecurityStamp ?? string.Empty);
 
     private static Result<UserRecord> ToFailure(IdentityResult result, string passwordField)
@@ -212,6 +288,10 @@ public sealed class IdentityUserDirectory(
         public string? Email { get; init; }
         public DateTimeOffset? LockoutEnd { get; init; }
         public string? SecurityStamp { get; init; }
-        public string? RoleName { get; init; }
+        public int? OrganizationId { get; init; }
+        public string? OrganizationName { get; init; }
+        public OrganizationRole? OrganizationRole { get; init; }
+        public bool? OrganizationIsActive { get; init; }
+        public bool IsSuperAdmin { get; init; }
     }
 }

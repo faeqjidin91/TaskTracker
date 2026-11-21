@@ -1,3 +1,4 @@
 namespace TaskTracker.Contracts.Projects;
 
-public record CreateProjectRequest(string Name, string? Description);
+// When OwnerUserId is omitted, the Admin creating the project becomes its owner.
+public record CreateProjectRequest(string Name, string? Description, string? OwnerUserId = null);

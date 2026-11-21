@@ -1,0 +1,277 @@
+@page "/organizations"
+@attribute [Authorize(Policy = WebPolicies.SuperAdmin)]
+@inject OrganizationApiClient OrganizationsApi
+
+<PageTitle>Organizations - TaskTracker</PageTitle>
+
+<h1 class="h3 mb-3" tabindex="-1">Organizations</h1>
+
+@if (_loading)
+{
+    <LoadingSpinner />
+}
+else if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+else
+{
+    @if (_actionError is not null)
+    {
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            @_actionError
+            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _actionError = null"></button>
+        </div>
+    }
+    @if (_success is not null)
+    {
+        <div class="alert alert-success alert-dismissible" role="status">
+            @_success
+            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _success = null"></button>
+        </div>
+    }
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Create organization</h2>
+            <EditForm Model="_newOrganization" OnValidSubmit="CreateAsync">
+                <DataAnnotationsValidator />
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label" for="organization-name">Name</label>
+                        <InputText id="organization-name" class="form-control" @bind-Value="_newOrganization.Name" />
+                        <div class="field-message"><ValidationMessage For="() => _newOrganization.Name" /></div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <label class="form-label" for="organization-admin-email">First admin email</label>
+                        <InputText id="organization-admin-email" type="email" class="form-control" autocomplete="off" @bind-Value="_newOrganization.AdminEmail" />
+                        <div class="field-message"><ValidationMessage For="() => _newOrganization.AdminEmail" /></div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <label class="form-label" for="organization-admin-password">Temporary password</label>
+                        <InputText id="organization-admin-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_newOrganization.AdminPassword" />
+                        <div class="field-message"><ValidationMessage For="() => _newOrganization.AdminPassword" /></div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary" disabled="@_creating">
+                            @(_creating ? "Creating..." : "Create organization")
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </section>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Users</th>
+                    <th scope="col">Status</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var organization in _organizations)
+                {
+                    var busy = _busyIds.Contains(organization.Id);
+
+                    <tr @key="organization.Id">
+                        <td class="fw-semibold">@organization.Name</td>
+                        <td>@organization.UserCount</td>
+                        <td>
+                            <span class="badge @(organization.IsActive ? "bg-success" : "bg-secondary")">
+                                @(organization.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" disabled="@busy"
+                                    aria-label="Add admin to @organization.Name" @onclick="() => OpenAddAdmin(organization)">Add admin</button>
+                            <button type="button" class="btn btn-sm @(organization.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                                    disabled="@busy" aria-label="@(organization.IsActive ? "Deactivate" : "Activate") @organization.Name"
+                                    @onclick="() => ToggleActiveAsync(organization)">
+                                @(organization.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </td>
+                    </tr>
+
+                    @if (_addAdminId == organization.Id)
+                    {
+                        <tr @key="AdminRowKey(organization)">
+                            <td colspan="4">
+                                <EditForm Model="_newAdmin" OnValidSubmit="() => AddAdminAsync(organization)">
+                                    <DataAnnotationsValidator />
+                                    <div class="row g-2">
+                                        <div class="col-12 col-md-5">
+                                            <label class="form-label" for="new-admin-email">Admin email</label>
+                                            <InputText id="new-admin-email" type="email" class="form-control" autocomplete="off" @bind-Value="_newAdmin.Email" />
+                                            <div class="field-message"><ValidationMessage For="() => _newAdmin.Email" /></div>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <label class="form-label" for="new-admin-password">Temporary password</label>
+                                            <InputText id="new-admin-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_newAdmin.Password" />
+                                            <div class="field-message"><ValidationMessage For="() => _newAdmin.Password" /></div>
+                                        </div>
+                                        <div class="col-12 col-md-3 d-flex align-items-start gap-2 pt-md-4 mt-md-2">
+                                            <button type="submit" class="btn btn-primary" disabled="@busy">Save admin</button>
+                                            <button type="button" class="btn btn-outline-secondary" @onclick="() => _addAdminId = null">Cancel</button>
+                                        </div>
+                                    </div>
+                                </EditForm>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private readonly HashSet<int> _busyIds = [];
+    private List<OrganizationDto> _organizations = [];
+    private NewOrganizationModel _newOrganization = new();
+    private NewAdminModel _newAdmin = new();
+    private int? _addAdminId;
+    private string? _loadError;
+    private string? _actionError;
+    private string? _success;
+    private bool _loading = true;
+    private bool _creating;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _loadError = null;
+
+        var result = await OrganizationsApi.GetAllAsync();
+
+        if (result.IsSuccess)
+        {
+            _organizations = result.Value;
+        }
+        else
+        {
+            _loadError = result.Error;
+        }
+
+        _loading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        ClearMessages();
+        _creating = true;
+
+        var result = await OrganizationsApi.CreateAsync(new CreateOrganizationRequest(
+            _newOrganization.Name.Trim(), _newOrganization.AdminEmail.Trim(), _newOrganization.AdminPassword));
+
+        _creating = false;
+        if (result.IsSuccess)
+        {
+            _organizations.Add(result.Value);
+            _organizations = _organizations.OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            _success = $"Created {result.Value.Name}.";
+            _newOrganization = new NewOrganizationModel();
+        }
+        else
+        {
+            _actionError = result.Error;
+        }
+    }
+
+    private async Task ToggleActiveAsync(OrganizationDto organization)
+    {
+        ClearMessages();
+        _busyIds.Add(organization.Id);
+
+        var result = await OrganizationsApi.UpdateStatusAsync(organization.Id, !organization.IsActive);
+        _busyIds.Remove(organization.Id);
+
+        if (result.IsSuccess)
+        {
+            Replace(organization with { IsActive = !organization.IsActive });
+        }
+        else
+        {
+            _actionError = result.Error;
+        }
+    }
+
+    private void OpenAddAdmin(OrganizationDto organization)
+    {
+        ClearMessages();
+        _newAdmin = new NewAdminModel();
+        _addAdminId = organization.Id;
+    }
+
+    private async Task AddAdminAsync(OrganizationDto organization)
+    {
+        ClearMessages();
+        _busyIds.Add(organization.Id);
+
+        var result = await OrganizationsApi.AddAdminAsync(organization.Id, _newAdmin.Email.Trim(), _newAdmin.Password);
+        _busyIds.Remove(organization.Id);
+
+        if (result.IsSuccess)
+        {
+            _addAdminId = null;
+            _newAdmin = new NewAdminModel();
+            Replace(organization with { UserCount = organization.UserCount + 1 });
+            _success = $"Added {result.Value.Email} to {organization.Name}.";
+        }
+        else
+        {
+            _actionError = result.Error;
+        }
+    }
+
+    private void Replace(OrganizationDto organization)
+    {
+        var index = _organizations.FindIndex(o => o.Id == organization.Id);
+        if (index >= 0)
+        {
+            _organizations[index] = organization;
+        }
+    }
+
+    private void ClearMessages()
+    {
+        _actionError = null;
+        _success = null;
+    }
+
+    private static string AdminRowKey(OrganizationDto organization) => $"admin-{organization.Id}";
+
+    private sealed class NewOrganizationModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [StringLength(200, ErrorMessage = "Name must be 200 characters or fewer.")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Admin email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        [StringLength(256, ErrorMessage = "Email must be 256 characters or fewer.")]
+        public string AdminEmail { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Temporary password is required.")]
+        public string AdminPassword { get; set; } = string.Empty;
+    }
+
+    private sealed class NewAdminModel
+    {
+        [Required(ErrorMessage = "Email is required.")]
+        [EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        [StringLength(256, ErrorMessage = "Email must be 256 characters or fewer.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Temporary password is required.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,200 @@
+@inject ProjectApiClient ProjectsApi
+
+<section class="card mb-4" aria-label="Project members">
+    <div class="card-body">
+        <h2 class="h5 card-title">Members</h2>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
+        <div class="list-group mb-3">
+            <div class="list-group-item d-flex justify-content-between align-items-center gap-2" data-testid="project-owner">
+                <span class="text-break">@Project.OwnerEmail</span>
+                <span class="badge bg-primary">Owner</span>
+            </div>
+
+            @if (_loading)
+            {
+                <div class="list-group-item"><LoadingSpinner /></div>
+            }
+
+            @foreach (var member in _members)
+            {
+                <div @key="member.UserId" class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span class="text-break">@member.Email</span>
+                    @if (Project.Permissions.CanManageMembers)
+                    {
+                        <span class="d-flex gap-2">
+                            <select class="form-select form-select-sm w-auto" aria-label="Project role for @member.Email"
+                                    value="@member.Role.ToString()" disabled="@_busy"
+                                    @onchange="e => ChangeRoleAsync(member, e)">
+                                @foreach (var role in Enum.GetValues<ProjectRole>())
+                                {
+                                    <option value="@role.ToString()">@role</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy"
+                                    aria-label="Remove @member.Email" @onclick="() => RemoveAsync(member)">Remove</button>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-light text-dark border">@member.Role</span>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (Project.Permissions.CanManageMembers && !_loading)
+        {
+            @if (Available.Count == 0)
+            {
+                <p class="text-muted small mb-0">Everyone in your organization is already on this project.</p>
+            }
+            else
+            {
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="member-user">Add member</label>
+                        <select id="member-user" class="form-select" @bind="_selectedUserId">
+                            <option value="">Select a user</option>
+                            @foreach (var candidate in Available)
+                            {
+                                <option value="@candidate.UserId">@candidate.Email</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-7 col-md-3">
+                        <label class="form-label" for="member-role">Role</label>
+                        <select id="member-role" class="form-select" @bind="_selectedRole">
+                            @foreach (var role in Enum.GetValues<ProjectRole>())
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-5 col-md-3">
+                        <button type="button" class="btn btn-primary w-100"
+                                disabled="@(_busy || string.IsNullOrEmpty(_selectedUserId))" @onclick="AddAsync">Add member</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</section>
+
+@code {
+    private List<ProjectMemberDto> _members = [];
+    private List<ProjectCandidateDto> _candidates = [];
+    private string _selectedUserId = string.Empty;
+    private ProjectRole _selectedRole = ProjectRole.Contributor;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+
+    [Parameter, EditorRequired]
+    public ProjectDto Project { get; set; } = default!;
+
+    private List<ProjectCandidateDto> Available => _candidates
+        .Where(c => c.UserId != Project.OwnerUserId && _members.All(m => m.UserId != c.UserId))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var members = await ProjectsApi.GetMembersAsync(Project.Id);
+        if (members.IsSuccess)
+        {
+            _members = members.Value;
+        }
+        else
+        {
+            _error = members.Error;
+        }
+
+        if (Project.Permissions.CanManageMembers)
+        {
+            var candidates = await ProjectsApi.GetCandidatesAsync(Project.Id);
+            if (candidates.IsSuccess)
+            {
+                _candidates = candidates.Value;
+            }
+            else
+            {
+                _error = candidates.Error;
+            }
+        }
+
+        _loading = false;
+    }
+
+    private async Task AddAsync()
+    {
+        _error = null;
+        _busy = true;
+
+        var result = await ProjectsApi.AddMemberAsync(Project.Id, _selectedUserId, _selectedRole);
+
+        _busy = false;
+        if (result.IsSuccess)
+        {
+            _members.Add(result.Value);
+            _members = _members.OrderBy(m => m.Email, StringComparer.OrdinalIgnoreCase).ToList();
+            _selectedUserId = string.Empty;
+            _selectedRole = ProjectRole.Contributor;
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task ChangeRoleAsync(ProjectMemberDto member, ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<ProjectRole>(args.Value?.ToString(), out var role) || role == member.Role)
+        {
+            return;
+        }
+
+        _error = null;
+        _busy = true;
+        Replace(member with { Role = role });
+
+        var result = await ProjectsApi.UpdateMemberAsync(Project.Id, member.UserId, role);
+        _busy = false;
+
+        if (!result.IsSuccess)
+        {
+            Replace(member);
+            _error = result.Error;
+        }
+    }
+
+    private async Task RemoveAsync(ProjectMemberDto member)
+    {
+        _error = null;
+        _busy = true;
+
+        var result = await ProjectsApi.RemoveMemberAsync(Project.Id, member.UserId);
+        _busy = false;
+
+        if (result.IsSuccess)
+        {
+            _members.RemoveAll(m => m.UserId == member.UserId);
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private void Replace(ProjectMemberDto member)
+    {
+        var index = _members.FindIndex(m => m.UserId == member.UserId);
+        if (index >= 0)
+        {
+            _members[index] = member;
+        }
+    }
+}

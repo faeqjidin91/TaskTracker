@@ -7,6 +7,11 @@ public static class TokenClaims
 {
     public const string Role = "role";
     public const string SecurityStamp = "sstamp";
+    public const string OrganizationId = "org";
+    public const string OrganizationName = "org_name";
+    public const string OrganizationRole = "org_role";
+
+    public const string SuperAdminRole = "SuperAdmin";
 
     // JWT payloads are readable by the client, so only a hash of the stamp goes in the token.
     public static string HashStamp(string securityStamp) =>

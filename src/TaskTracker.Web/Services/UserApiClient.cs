@@ -10,7 +10,7 @@ public sealed class UserApiClient(HttpClient http) : ApiClientBase(http)
     public Task<ApiResult<UserDto>> CreateAsync(CreateUserRequest request) =>
         PostAsync<CreateUserRequest, UserDto>("api/users", request);
 
-    public Task<ApiResult> UpdateRoleAsync(string id, UserRole role) =>
+    public Task<ApiResult> UpdateRoleAsync(string id, OrganizationRole role) =>
         PatchAsync($"api/users/{id}/role", new UpdateUserRoleRequest(role));
 
     public Task<ApiResult> UpdateStatusAsync(string id, bool isActive) =>

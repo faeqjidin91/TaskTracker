@@ -9,7 +9,16 @@
 
 <div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
     <nav class="flex-column">
-        <AuthorizeView>
+        <AuthorizeView Policy="@WebPolicies.SuperAdmin">
+            <Authorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="organizations" Match="NavLinkMatch.Prefix">
+                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Organizations
+                    </NavLink>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+        <AuthorizeView Policy="@WebPolicies.InOrganization">
             <Authorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="projects" Match="NavLinkMatch.Prefix">
@@ -18,7 +27,7 @@
                 </div>
             </Authorized>
         </AuthorizeView>
-        <AuthorizeView Policy="@WebPolicies.CanManageUsers">
+        <AuthorizeView Policy="@WebPolicies.OrganizationAdmin">
             <Authorized>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="users" Match="NavLinkMatch.Prefix">

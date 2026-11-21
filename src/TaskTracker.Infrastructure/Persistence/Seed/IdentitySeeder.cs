@@ -1,30 +1,84 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using TaskTracker.Domain.Entities;
 using TaskTracker.Domain.Enums;
+using TaskTracker.Infrastructure.Auth;
 
 namespace TaskTracker.Infrastructure.Persistence.Seed;
 
-// Creates the documented local test user as an Admin. The Api runs this in Development only.
-public class IdentitySeeder(UserManager<IdentityUser> userManager, ILogger<IdentitySeeder> logger)
+public class IdentitySeeder(UserManager<IdentityUser> userManager, AppDbContext db, ILogger<IdentitySeeder> logger)
 {
-    private const string TestEmail = "admin@tasktracker.local";
+    private const string TestAdminEmail = "admin@tasktracker.local";
+    private const string TestSuperAdminEmail = "superadmin@tasktracker.local";
     private const string TestPassword = "Passw0rd!";
 
-    public async Task SeedAsync()
+    // Development only: documented local accounts, with the demo projects owned by the Admin.
+    public async Task SeedDevelopmentAsync()
     {
-        var user = await userManager.FindByEmailAsync(TestEmail);
-        if (user is null)
+        await EnsureSuperAdminAsync(TestSuperAdminEmail, TestPassword);
+
+        var admin = await userManager.FindByEmailAsync(TestAdminEmail);
+        if (admin is null)
         {
-            user = new IdentityUser { UserName = TestEmail, Email = TestEmail, EmailConfirmed = true };
-            EnsureSucceeded(await userManager.CreateAsync(user, TestPassword));
-            logger.LogInformation("Created test user {Email}", TestEmail);
+            admin = new IdentityUser { UserName = TestAdminEmail, Email = TestAdminEmail, EmailConfirmed = true };
+            EnsureSucceeded(await userManager.CreateAsync(admin, TestPassword));
+            logger.LogInformation("Created test user {Email}", TestAdminEmail);
         }
 
-        // Databases seeded before roles existed already have this user without a role.
-        var admin = nameof(UserRole.Admin);
-        if (!await userManager.IsInRoleAsync(user, admin))
+        var memberships = db.OrganizationMembers.IgnoreQueryFilters();
+        if (!await memberships.AnyAsync(m => m.UserId == admin.Id))
         {
-            EnsureSucceeded(await userManager.AddToRoleAsync(user, admin));
+            db.OrganizationMembers.Add(new OrganizationMember
+            {
+                OrganizationId = SeedIds.DefaultOrganizationId,
+                UserId = admin.Id,
+                Role = OrganizationRole.Admin
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var demoProjects = await db.Projects
+            .IgnoreQueryFilters()
+            .Where(p => p.OwnerUserId == SeedIds.SystemUserId)
+            .ToListAsync();
+
+        foreach (var project in demoProjects)
+        {
+            project.OwnerUserId = admin.Id;
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    // Any environment: creates the first SuperAdmin from secrets, and only if none exists.
+    public async Task BootstrapSuperAdminAsync(string email, string password)
+    {
+        if ((await userManager.GetUsersInRoleAsync(TokenClaims.SuperAdminRole)).Count > 0)
+        {
+            return;
+        }
+
+        await EnsureSuperAdminAsync(email, password);
+    }
+
+    private async Task EnsureSuperAdminAsync(string email, string password)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
+            EnsureSucceeded(await userManager.CreateAsync(user, password));
+            logger.LogInformation("Created SuperAdmin {Email}", email);
+        }
+        else if (await db.OrganizationMembers.IgnoreQueryFilters().AnyAsync(m => m.UserId == user.Id))
+        {
+            throw new InvalidOperationException($"{email} belongs to an organization and cannot be a SuperAdmin.");
+        }
+
+        if (!await userManager.IsInRoleAsync(user, TokenClaims.SuperAdminRole))
+        {
+            EnsureSucceeded(await userManager.AddToRoleAsync(user, TokenClaims.SuperAdminRole));
         }
     }
 
@@ -33,7 +87,7 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, ILogger<Ident
         if (!result.Succeeded)
         {
             var errors = string.Join("; ", result.Errors.Select(e => e.Description));
-            throw new InvalidOperationException($"Could not seed test user: {errors}");
+            throw new InvalidOperationException($"Could not seed user: {errors}");
         }
     }
 }

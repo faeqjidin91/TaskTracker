@@ -1,0 +1,164 @@
+@inject ProjectApiClient ProjectsApi
+
+<details class="card mb-4" data-testid="project-settings">
+    <summary class="card-header">Project settings</summary>
+    <div class="card-body">
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
+        @if (Project.Permissions.CanEdit)
+        {
+            <EditForm Model="_details" OnValidSubmit="SaveAsync" class="mb-4">
+                <DataAnnotationsValidator />
+                <div class="mb-2">
+                    <label class="form-label" for="settings-name">Project name</label>
+                    <InputText id="settings-name" class="form-control" @bind-Value="_details.Name" />
+                    <div class="field-message"><ValidationMessage For="() => _details.Name" /></div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="settings-description">Project description</label>
+                    <InputTextArea id="settings-description" class="form-control" rows="2" @bind-Value="_details.Description" />
+                    <div class="field-message"><ValidationMessage For="() => _details.Description" /></div>
+                </div>
+                <button type="submit" class="btn btn-primary" disabled="@_busy">Save changes</button>
+            </EditForm>
+        }
+
+        @if (Project.Permissions.CanTransferOwner)
+        {
+            <div class="mb-4">
+                <label class="form-label" for="settings-owner">Transfer ownership</label>
+                <div class="d-flex flex-wrap gap-2">
+                    <select id="settings-owner" class="form-select w-auto flex-grow-1" @bind="_newOwnerId">
+                        <option value="">Select a new owner</option>
+                        @foreach (var candidate in _candidates.Where(c => c.UserId != Project.OwnerUserId))
+                        {
+                            <option value="@candidate.UserId">@candidate.Email</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-outline-primary"
+                            disabled="@(_busy || string.IsNullOrEmpty(_newOwnerId))" @onclick="TransferAsync">Transfer</button>
+                </div>
+            </div>
+        }
+
+        @if (Project.Permissions.CanDelete)
+        {
+            @if (_confirmingDelete)
+            {
+                <span class="me-2">Delete this project and all its tasks?</span>
+                <button type="button" class="btn btn-sm btn-danger me-1" disabled="@_busy" @onclick="DeleteAsync">Yes, delete project</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmingDelete = false">Cancel</button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmingDelete = true">Delete project</button>
+            }
+        }
+    </div>
+</details>
+
+@code {
+    private DetailsModel _details = new();
+    private List<ProjectCandidateDto> _candidates = [];
+    private string _newOwnerId = string.Empty;
+    private bool _confirmingDelete;
+    private bool _busy;
+    private string? _error;
+
+    [Parameter, EditorRequired]
+    public ProjectDto Project { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleted { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _details = new DetailsModel { Name = Project.Name, Description = Project.Description };
+
+        if (Project.Permissions.CanTransferOwner)
+        {
+            var candidates = await ProjectsApi.GetCandidatesAsync(Project.Id);
+            if (candidates.IsSuccess)
+            {
+                _candidates = candidates.Value;
+            }
+            else
+            {
+                _error = candidates.Error;
+            }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        _busy = true;
+
+        var result = await ProjectsApi.UpdateAsync(Project.Id, new UpdateProjectRequest(
+            _details.Name.Trim(),
+            string.IsNullOrWhiteSpace(_details.Description) ? null : _details.Description.Trim()));
+
+        _busy = false;
+        if (result.IsSuccess)
+        {
+            await OnChanged.InvokeAsync();
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task TransferAsync()
+    {
+        _error = null;
+        _busy = true;
+
+        var result = await ProjectsApi.TransferOwnerAsync(Project.Id, _newOwnerId);
+
+        _busy = false;
+        if (result.IsSuccess)
+        {
+            await OnChanged.InvokeAsync();
+        }
+        else
+        {
+            _error = result.Error;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        _error = null;
+        _busy = true;
+
+        var result = await ProjectsApi.DeleteAsync(Project.Id);
+
+        _busy = false;
+        if (result.IsSuccess)
+        {
+            await OnDeleted.InvokeAsync();
+        }
+        else
+        {
+            _confirmingDelete = false;
+            _error = result.Error;
+        }
+    }
+
+    private sealed class DetailsModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [StringLength(100, ErrorMessage = "Name must be 100 characters or fewer.")]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500, ErrorMessage = "Description must be 500 characters or fewer.")]
+        public string? Description { get; set; }
+    }
+}

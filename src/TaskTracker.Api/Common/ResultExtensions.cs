@@ -45,6 +45,9 @@ public static class ResultExtensions
             case ResultStatus.Unauthorized:
                 return controller.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Invalid email or password.");
 
+            case ResultStatus.Forbidden:
+                return controller.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not have permission to do that.");
+
             case ResultStatus.Conflict:
                 return controller.Problem(statusCode: StatusCodes.Status409Conflict, title: result.Message);
 

@@ -36,9 +36,14 @@ Never add a reference that breaks this graph.
 - All EF calls async with CancellationToken.
 - DTOs are `record` types in Contracts. Never return entities from the API.
 - Errors return RFC 7807 ProblemDetails. Status codes: 200, 201 + Location, 204, 400, 401, 403, 404, 409.
-- Project and task GET endpoints are anonymous. User endpoints and `/api/auth/me` always require auth.
-- POST/PUT/PATCH/DELETE require a named policy from `Policies`, except login and change-password.
-- Roles are global, one per user: Admin (everything), Member (manage tasks), Viewer (read only).
+- Every endpoint requires auth except login. This replaces the original anonymous-GET rule,
+  because public reads would expose data across organizations.
+- Hierarchy: Platform -> Organization -> Project -> Task. Each user belongs to one organization.
+- SuperAdmin is the only global role. It manages organizations and cannot read their data.
+- Organization roles: Admin, Member. Project roles: owner (Project.OwnerUserId), Contributor, Viewer.
+- Only the project owner can assign members. Per-project rules live in `ProjectPermissions`.
+- The organization always comes from the signed-in user, never from the request. EF query filters
+  enforce it. Another organization's data returns 404. `IgnoreQueryFilters` stays in Infrastructure.
 - ASP.NET Core Identity stays in Infrastructure, behind `IUserDirectory`.
 - Program.cs stays thin: use extension methods (AddApplication, AddInfrastructure, etc.).
 - No secrets committed. Dev JWT key goes in `dotnet user-secrets`.

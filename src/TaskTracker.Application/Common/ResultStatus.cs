@@ -6,5 +6,6 @@ public enum ResultStatus
     NotFound,
     ValidationFailed,
     Unauthorized,
+    Forbidden,
     Conflict
 }

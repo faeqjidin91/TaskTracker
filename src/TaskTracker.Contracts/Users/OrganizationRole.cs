@@ -1,9 +1,8 @@
 namespace TaskTracker.Contracts.Users;
 
 // Duplicates the Domain enum for the same reason as TaskItemStatus: Web cannot see Domain.
-public enum UserRole
+public enum OrganizationRole
 {
-    Viewer = 0,
-    Member = 1,
-    Admin = 2
+    Member = 0,
+    Admin = 1
 }

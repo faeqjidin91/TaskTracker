@@ -15,6 +15,7 @@ public sealed class DatabaseNotificationPublisher(IServiceScopeFactory scopeFact
 
         db.NotificationLogs.Add(new NotificationLog
         {
+            OrganizationId = evt.OrganizationId,
             TaskId = evt.TaskId,
             Message = $"Task {evt.TaskId} \"{evt.Title}\" changed from {evt.OldStatus} to {evt.NewStatus} by {evt.ChangedBy}",
             CreatedAtUtc = evt.OccurredAtUtc

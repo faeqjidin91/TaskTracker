@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TaskTracker.Application.Abstractions;
+using TaskTracker.Application.Authorization;
 using TaskTracker.Application.Common;
 using TaskTracker.Application.Mapping;
 using TaskTracker.Contracts.Tasks;
@@ -17,6 +18,7 @@ public class TaskService(
     IValidator<UpdateTaskStatusRequest> statusValidator,
     INotificationPublisher publisher,
     ICurrentUser currentUser,
+    IProjectAccess access,
     TimeProvider timeProvider,
     ILogger<TaskService> logger) : ITaskService
 {
@@ -24,7 +26,7 @@ public class TaskService(
 
     public async Task<Result<IReadOnlyList<TaskDto>>> GetByProjectAsync(int projectId, CancellationToken ct)
     {
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct))
+        if (await access.GetAsync(projectId, ct) is null)
         {
             return Result<IReadOnlyList<TaskDto>>.NotFound();
         }
@@ -43,9 +45,12 @@ public class TaskService(
     {
         var task = await db.Tasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
 
-        return task is null
-            ? Result<TaskDto>.NotFound()
-            : Result<TaskDto>.Success(task.ToDto());
+        if (task is null || await access.GetAsync(task.ProjectId, ct) is null)
+        {
+            return Result<TaskDto>.NotFound();
+        }
+
+        return Result<TaskDto>.Success(task.ToDto());
     }
 
     public async Task<Result<TaskDto>> CreateAsync(int projectId, CreateTaskRequest request, CancellationToken ct)
@@ -56,9 +61,10 @@ public class TaskService(
             return Result<TaskDto>.ValidationFailed(validation.ToDictionary());
         }
 
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId, ct))
+        var denied = await DenyTaskChangeAsync<TaskDto>(projectId, ct);
+        if (denied is not null)
         {
-            return Result<TaskDto>.NotFound();
+            return denied;
         }
 
         var now = UtcNow();
@@ -93,6 +99,12 @@ public class TaskService(
             return Result<Unit>.NotFound();
         }
 
+        var denied = await DenyTaskChangeAsync<Unit>(task.ProjectId, ct);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
         task.Title = request.Title.Trim();
         task.Description = request.Description;
         task.Priority = request.Priority.ToDomain();
@@ -117,6 +129,12 @@ public class TaskService(
             return Result<Unit>.NotFound();
         }
 
+        var denied = await DenyTaskChangeAsync<Unit>(task.ProjectId, ct);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
         var newStatus = request.Status.ToDomain();
         if (task.Status == newStatus)
         {
@@ -130,6 +148,7 @@ public class TaskService(
         await PublishStatusChangedAsync(new TaskStatusChangedEvent(
             task.Id,
             task.ProjectId,
+            currentUser.OrganizationId ?? 0,
             task.Title,
             oldStatus,
             newStatus,
@@ -147,10 +166,29 @@ public class TaskService(
             return Result<Unit>.NotFound();
         }
 
+        var denied = await DenyTaskChangeAsync<Unit>(task.ProjectId, ct);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
         db.Tasks.Remove(task);
         await db.SaveChangesAsync(ct);
 
         return Result<Unit>.Success(Unit.Value);
+    }
+
+    // Hidden projects return 404, so a user cannot probe which ids exist.
+    private async Task<Result<T>?> DenyTaskChangeAsync<T>(int projectId, CancellationToken ct)
+    {
+        var permissions = await access.GetAsync(projectId, ct);
+
+        if (permissions is null)
+        {
+            return Result<T>.NotFound();
+        }
+
+        return permissions.CanManageTasks ? null : Result<T>.Forbidden();
     }
 
     // Runs after the save, so a failure here must not fail the request. The change is already

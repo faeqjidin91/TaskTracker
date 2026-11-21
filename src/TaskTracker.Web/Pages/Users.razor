@@ -1,5 +1,5 @@
 @page "/users"
-@attribute [Authorize(Policy = WebPolicies.CanManageUsers)]
+@attribute [Authorize(Policy = WebPolicies.OrganizationAdmin)]
 @inject UserApiClient UsersApi
 
 <PageTitle>Users - TaskTracker</PageTitle>
@@ -53,7 +53,7 @@ else
                     <div class="col-12 col-sm-4 col-lg-3">
                         <label class="form-label" for="user-role">Role</label>
                         <InputSelect id="user-role" class="form-select" @bind-Value="_newUser.Role">
-                            @foreach (var role in Enum.GetValues<UserRole>())
+                            @foreach (var role in Enum.GetValues<OrganizationRole>())
                             {
                                 <option value="@role">@role</option>
                             }
@@ -97,7 +97,7 @@ else
                             <select class="form-select form-select-sm" aria-label="Role for @user.Email"
                                     value="@user.Role.ToString()" disabled="@(isSelf || busy)"
                                     @onchange="e => ChangeRoleAsync(user, e)">
-                                @foreach (var role in Enum.GetValues<UserRole>())
+                                @foreach (var role in Enum.GetValues<OrganizationRole>())
                                 {
                                     <option value="@role.ToString()">@role</option>
                                 }
@@ -211,7 +211,7 @@ else
 
     private async Task ChangeRoleAsync(UserDto user, ChangeEventArgs args)
     {
-        if (!Enum.TryParse<UserRole>(args.Value?.ToString(), out var role) || role == user.Role)
+        if (!Enum.TryParse<OrganizationRole>(args.Value?.ToString(), out var role) || role == user.Role)
         {
             return;
         }
@@ -305,7 +305,7 @@ else
         [Required(ErrorMessage = "Temporary password is required.")]
         public string Password { get; set; } = string.Empty;
 
-        public UserRole Role { get; set; } = UserRole.Member;
+        public OrganizationRole Role { get; set; } = OrganizationRole.Member;
     }
 
     private sealed class ResetModel

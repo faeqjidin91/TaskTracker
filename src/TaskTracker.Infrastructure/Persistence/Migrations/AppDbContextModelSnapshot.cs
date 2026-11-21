@@ -51,24 +51,10 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a01",
-                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a01",
-                            Name = "Viewer",
-                            NormalizedName = "VIEWER"
-                        },
-                        new
-                        {
-                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a02",
-                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a02",
-                            Name = "Member",
-                            NormalizedName = "MEMBER"
-                        },
-                        new
-                        {
-                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a03",
-                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a03",
-                            Name = "Admin",
-                            NormalizedName = "ADMIN"
+                            Id = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a04",
+                            ConcurrencyStamp = "7f1c9a52-3b64-4c1e-9a10-1d5e8b2f6a04",
+                            Name = "SuperAdmin",
+                            NormalizedName = "SUPERADMIN"
                         });
                 });
 
@@ -160,6 +146,24 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
+                            AccessFailedCount = 0,
+                            ConcurrencyStamp = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
+                            Email = "system@tasktracker.local",
+                            EmailConfirmed = false,
+                            LockoutEnabled = true,
+                            LockoutEnd = new DateTimeOffset(new DateTime(9999, 12, 31, 23, 59, 59, 999, DateTimeKind.Unspecified).AddTicks(9999), new TimeSpan(0, 0, 0, 0, 0)),
+                            NormalizedEmail = "SYSTEM@TASKTRACKER.LOCAL",
+                            NormalizedUserName = "SYSTEM@TASKTRACKER.LOCAL",
+                            PhoneNumberConfirmed = false,
+                            SecurityStamp = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
+                            TwoFactorEnabled = false,
+                            UserName = "system@tasktracker.local"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
@@ -243,6 +247,71 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("TaskTracker.Domain.Entities.Organization", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Organizations", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
+                            IsActive = true,
+                            Name = "Default Organization"
+                        });
+                });
+
+            modelBuilder.Entity("TaskTracker.Domain.Entities.OrganizationMember", b =>
+                {
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("OrganizationId", "UserId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("OrganizationMembers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            OrganizationId = 1,
+                            UserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01",
+                            Role = "Admin"
+                        });
+                });
+
             modelBuilder.Entity("TaskTracker.Domain.Entities.Project", b =>
                 {
                     b.Property<int>("Id")
@@ -263,7 +332,17 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("OwnerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "OwnerUserId");
 
                     b.ToTable("Projects", (string)null);
 
@@ -273,15 +352,49 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                             Id = 1,
                             CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Refresh the marketing site with a new design system.",
-                            Name = "Website Redesign"
+                            Name = "Website Redesign",
+                            OrganizationId = 1,
+                            OwnerUserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01"
                         },
                         new
                         {
                             Id = 2,
                             CreatedAtUtc = new DateTime(2026, 1, 5, 9, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Second major release of the mobile app.",
-                            Name = "Mobile App v2"
+                            Name = "Mobile App v2",
+                            OrganizationId = 1,
+                            OwnerUserId = "3c0f6e1a-8d42-4b7e-9f55-6a2b1c7d9e01"
                         });
+                });
+
+            modelBuilder.Entity("TaskTracker.Domain.Entities.ProjectMember", b =>
+                {
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("AddedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("ProjectId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "ProjectId");
+
+                    b.HasIndex("OrganizationId", "UserId");
+
+                    b.ToTable("ProjectMembers", (string)null);
                 });
 
             modelBuilder.Entity("TaskTracker.Domain.Entities.TaskItem", b =>
@@ -400,6 +513,9 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("int");
+
                     b.Property<int>("TaskId")
                         .HasColumnType("int");
 
@@ -461,6 +577,56 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("TaskTracker.Domain.Entities.OrganizationMember", b =>
+                {
+                    b.HasOne("TaskTracker.Domain.Entities.Organization", "Organization")
+                        .WithMany("Members")
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("TaskTracker.Domain.Entities.Project", b =>
+                {
+                    b.HasOne("TaskTracker.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("TaskTracker.Domain.Entities.OrganizationMember", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "OwnerUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TaskTracker.Domain.Entities.ProjectMember", b =>
+                {
+                    b.HasOne("TaskTracker.Domain.Entities.Project", "Project")
+                        .WithMany("Members")
+                        .HasForeignKey("OrganizationId", "ProjectId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TaskTracker.Domain.Entities.OrganizationMember", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("TaskTracker.Domain.Entities.TaskItem", b =>
                 {
                     b.HasOne("TaskTracker.Domain.Entities.Project", "Project")
@@ -472,8 +638,15 @@ namespace TaskTracker.Infrastructure.Persistence.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("TaskTracker.Domain.Entities.Organization", b =>
+                {
+                    b.Navigation("Members");
+                });
+
             modelBuilder.Entity("TaskTracker.Domain.Entities.Project", b =>
                 {
+                    b.Navigation("Members");
+
                     b.Navigation("Tasks");
                 });
 #pragma warning restore 612, 618

@@ -17,6 +17,6 @@ public sealed class IdentityUserAuthenticator(UserManager<IdentityUser> users, I
         }
 
         var record = await directory.GetByIdAsync(user.Id, ct);
-        return record is { IsActive: true } ? record : null;
+        return record is { CanSignIn: true } ? record : null;
     }
 }

@@ -10,7 +10,7 @@ builder.Services.AddApi(builder.Configuration);
 
 var app = builder.Build();
 
-await app.InitializeDevelopmentDatabaseAsync();
+await app.InitializeDatabaseAsync();
 app.UseApiPipeline();
 
 await app.RunAsync();

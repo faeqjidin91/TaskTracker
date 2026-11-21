@@ -39,6 +39,7 @@ public sealed class ServiceBusNotificationPublisher : INotificationPublisher, IA
             ContentType = "application/json"
         };
         message.ApplicationProperties["ProjectId"] = evt.ProjectId;
+        message.ApplicationProperties["OrganizationId"] = evt.OrganizationId;
 
         await _sender.SendMessageAsync(message, ct);
     }

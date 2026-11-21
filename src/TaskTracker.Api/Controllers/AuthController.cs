@@ -21,9 +21,9 @@ public class AuthController(IAuthService auth) : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
-    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CurrentUserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserDto>> Me(CancellationToken ct) =>
+    public async Task<ActionResult<CurrentUserDto>> Me(CancellationToken ct) =>
         this.ToOk(await auth.GetCurrentUserAsync(ct));
 
     [HttpPost("change-password")]

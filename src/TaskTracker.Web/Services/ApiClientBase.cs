@@ -28,6 +28,9 @@ public abstract class ApiClientBase(HttpClient http)
     protected Task<ApiResult> PostNoContentAsync<TRequest>(string uri, TRequest body) =>
         SendAsync(() => http.PostAsJsonAsync(uri, body, JsonOptions));
 
+    protected Task<ApiResult> PutAsync<TRequest>(string uri, TRequest body) =>
+        SendAsync(() => http.PutAsJsonAsync(uri, body, JsonOptions));
+
     protected Task<ApiResult> PatchAsync<TRequest>(string uri, TRequest body) =>
         SendAsync(() => http.PatchAsJsonAsync(uri, body, JsonOptions));
 

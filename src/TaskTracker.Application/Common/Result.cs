@@ -33,6 +33,11 @@ public sealed class Result<T>
 
     public static Result<T> Unauthorized() => new(ResultStatus.Unauthorized, default, NoErrors);
 
+    public static Result<T> Forbidden() => new(ResultStatus.Forbidden, default, NoErrors);
+
+    public static Result<T> Invalid(string field, string message) =>
+        ValidationFailed(new Dictionary<string, string[]> { [field] = [message] });
+
     public static Result<T> Conflict(string message) => new(ResultStatus.Conflict, default, NoErrors, message);
 
     public static Result<T> ValidationFailed(IDictionary<string, string[]> errors) =>

@@ -37,6 +37,8 @@ public static class WebServiceCollectionExtensions
             .AddHttpMessageHandler<AuthHeaderHandler>();
         services.AddHttpClient<AccountApiClient>(client => client.BaseAddress = apiBaseUri)
             .AddHttpMessageHandler<AuthHeaderHandler>();
+        services.AddHttpClient<OrganizationApiClient>(client => client.BaseAddress = apiBaseUri)
+            .AddHttpMessageHandler<AuthHeaderHandler>();
 
         return services;
     }

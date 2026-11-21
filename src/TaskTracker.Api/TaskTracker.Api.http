@@ -13,11 +13,17 @@ Content-Type: application/json
 ###
 @token = {{login.response.body.$.accessToken}}
 
-### List projects (anonymous)
+### List projects visible to you
 GET {{TaskTracker.Api_HostAddress}}/api/projects
+Authorization: Bearer {{token}}
 
-### List tasks in project 1 (anonymous)
+### List tasks in project 1
 GET {{TaskTracker.Api_HostAddress}}/api/projects/1/tasks
+Authorization: Bearer {{token}}
+
+### List project 1 members
+GET {{TaskTracker.Api_HostAddress}}/api/projects/1/members
+Authorization: Bearer {{token}}
 
 ### Create a task without a token (expect 401)
 POST {{TaskTracker.Api_HostAddress}}/api/projects/1/tasks

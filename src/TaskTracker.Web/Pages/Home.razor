@@ -1,0 +1,19 @@
+@page "/"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+
+<PageTitle>TaskTracker</PageTitle>
+
+<LoadingSpinner />
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    // SuperAdmins have no organization, so their landing page is different.
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthenticationState).User;
+        Navigation.NavigateTo(user.IsInRole(WebPolicies.SuperAdmin) ? "organizations" : "projects", replace: true);
+    }
+}

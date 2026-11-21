@@ -1,7 +1,9 @@
-@page "/"
 @page "/projects"
-@attribute [Authorize]
+@attribute [Authorize(Policy = WebPolicies.InOrganization)]
 @inject ProjectApiClient ProjectsApi
+@inject UserApiClient UsersApi
+@inject IAuthorizationService Authorization
+@inject NavigationManager Navigation
 
 <PageTitle>Projects - TaskTracker</PageTitle>
 
@@ -18,38 +20,101 @@ else if (_error is not null)
         <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadAsync">Retry</button>
     </div>
 }
-else if (_projects.Count == 0)
-{
-    <p class="text-muted">No projects yet.</p>
-}
 else
 {
-    <div class="list-group">
-        @foreach (var project in _projects)
+    @if (_isAdmin)
+    {
+        @if (_createError is not null)
         {
-            <a @key="project.Id" href="projects/@project.Id"
-               class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
-                <span>
-                    <span class="fw-semibold d-block">@project.Name</span>
-                    @if (!string.IsNullOrWhiteSpace(project.Description))
-                    {
-                        <small class="text-muted">@project.Description</small>
-                    }
-                </span>
-                <span class="badge bg-secondary rounded-pill text-nowrap">
-                    @project.TaskCount @(project.TaskCount == 1 ? "task" : "tasks")
-                </span>
-            </a>
+            <div class="alert alert-danger" role="alert">@_createError</div>
         }
-    </div>
+
+        <section class="card mb-4">
+            <div class="card-body">
+                <h2 class="h5 card-title">New project</h2>
+                <EditForm Model="_newProject" OnValidSubmit="CreateAsync">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label" for="project-name">Name</label>
+                            <InputText id="project-name" class="form-control" @bind-Value="_newProject.Name" />
+                            <div class="field-message"><ValidationMessage For="() => _newProject.Name" /></div>
+                        </div>
+                        <div class="col-12 col-lg-7">
+                            <label class="form-label" for="project-owner">Owner</label>
+                            <InputSelect id="project-owner" class="form-select" @bind-Value="_newProject.OwnerUserId">
+                                <option value="">Me</option>
+                                @foreach (var user in _owners)
+                                {
+                                    <option value="@user.Id">@user.Email</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="project-description">Description</label>
+                            <InputTextArea id="project-description" class="form-control" rows="2" @bind-Value="_newProject.Description" />
+                            <div class="field-message"><ValidationMessage For="() => _newProject.Description" /></div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary" disabled="@_creating">
+                                @(_creating ? "Creating..." : "Create project")
+                            </button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </section>
+    }
+
+    @if (_projects.Count == 0)
+    {
+        <p class="text-muted">
+            @(_isAdmin ? "No projects yet." : "You have not been added to any projects yet.")
+        </p>
+    }
+    else
+    {
+        <div class="list-group">
+            @foreach (var project in _projects)
+            {
+                <a @key="project.Id" href="projects/@project.Id"
+                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
+                    <span class="text-break">
+                        <span class="fw-semibold d-block">@project.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(project.Description))
+                        {
+                            <small class="text-muted d-block">@project.Description</small>
+                        }
+                        <small class="text-muted">Owner: @project.OwnerEmail</small>
+                    </span>
+                    <span class="badge bg-secondary rounded-pill text-nowrap">
+                        @project.TaskCount @(project.TaskCount == 1 ? "task" : "tasks")
+                    </span>
+                </a>
+            }
+        </div>
+    }
 }
 
 @code {
     private List<ProjectDto> _projects = [];
+    private List<UserDto> _owners = [];
+    private NewProjectModel _newProject = new();
     private bool _loading = true;
+    private bool _creating;
+    private bool _isAdmin;
     private string? _error;
+    private string? _createError;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationState;
+        _isAdmin = (await Authorization.AuthorizeAsync(state.User, WebPolicies.OrganizationAdmin)).Succeeded;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -67,6 +132,52 @@ else
             _error = result.Error;
         }
 
+        if (_isAdmin && result.IsSuccess)
+        {
+            var users = await UsersApi.GetAllAsync();
+            if (users.IsSuccess)
+            {
+                _owners = users.Value.Where(u => u.IsActive).ToList();
+            }
+            else
+            {
+                _error = users.Error;
+            }
+        }
+
         _loading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        _createError = null;
+        _creating = true;
+
+        var result = await ProjectsApi.CreateAsync(new CreateProjectRequest(
+            _newProject.Name.Trim(),
+            string.IsNullOrWhiteSpace(_newProject.Description) ? null : _newProject.Description.Trim(),
+            string.IsNullOrEmpty(_newProject.OwnerUserId) ? null : _newProject.OwnerUserId));
+
+        _creating = false;
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo($"projects/{result.Value.Id}");
+        }
+        else
+        {
+            _createError = result.Error;
+        }
+    }
+
+    private sealed class NewProjectModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [StringLength(100, ErrorMessage = "Name must be 100 characters or fewer.")]
+        public string Name { get; set; } = string.Empty;
+
+        [StringLength(500, ErrorMessage = "Description must be 500 characters or fewer.")]
+        public string? Description { get; set; }
+
+        public string OwnerUserId { get; set; } = string.Empty;
     }
 }

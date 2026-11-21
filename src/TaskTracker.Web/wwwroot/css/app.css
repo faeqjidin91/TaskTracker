@@ -36,6 +36,15 @@ a, .btn-link {
     color: red;
 }
 
+/* Stops a long email from pushing the header past the screen edge on phones. */
+.user-email {
+    display: inline-block;
+    max-width: 38vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
 /* Keeps absolutely positioned screen-reader text inside the scroll area on phones. */
 .table-responsive {
     position: relative;

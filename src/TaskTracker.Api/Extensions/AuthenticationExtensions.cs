@@ -52,6 +52,7 @@ public static class AuthenticationExtensions
         var isCurrent = await sessions.IsCurrentAsync(
             user?.FindFirstValue(JwtRegisteredClaimNames.Sub),
             user?.FindFirstValue(TokenClaims.SecurityStamp),
+            user?.HasClaim(c => c.Type == TokenClaims.OrganizationId) == true,
             context.HttpContext.RequestAborted);
 
         if (!isCurrent)

@@ -1,0 +1,16 @@
+<label class="search-box">
+    <Icon Name="search" Size="16" />
+    <input type="search" placeholder="@Placeholder" aria-label="@Placeholder" value="@Value"
+           @oninput="e => ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" />
+</label>
+
+@code {
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Placeholder { get; set; } = "Search...";
+}

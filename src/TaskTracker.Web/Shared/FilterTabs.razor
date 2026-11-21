@@ -1,0 +1,26 @@
+<div class="filter-tabs" role="group" aria-label="@Label">
+    @foreach (var tab in Items)
+    {
+        <button type="button" aria-pressed="@(tab.Key == Value ? "true" : "false")" @onclick="() => ValueChanged.InvokeAsync(tab.Key)">
+            @tab.Label
+            @if (tab.Count is { } count)
+            {
+                <span class="tab-count">@count</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<FilterTab> Items { get; set; } = [];
+
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Filter";
+}

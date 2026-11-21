@@ -4,9 +4,12 @@
 
 <PageTitle>Account - TaskTracker</PageTitle>
 
-<div class="row">
-    <div class="col-12 col-md-8 col-lg-5">
-        <h1 class="h3 mb-3" tabindex="-1">Change password</h1>
+<PageHeader Title="Account" Subtitle="Manage your sign-in details" />
+
+<div class="narrow">
+    <section class="panel">
+        <h2>Change password</h2>
+        <p class="panel-note">You stay signed in here. Other sessions are signed out.</p>
 
         @if (_error is not null)
         {
@@ -42,7 +45,7 @@
                 @(_submitting ? "Saving..." : "Change password")
             </button>
         </EditForm>
-    </div>
+    </section>
 </div>
 
 @code {

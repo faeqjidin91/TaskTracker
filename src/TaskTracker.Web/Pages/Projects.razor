@@ -7,7 +7,16 @@
 
 <PageTitle>Projects - TaskTracker</PageTitle>
 
-<h1 class="h3 mb-3" tabindex="-1">Projects</h1>
+<PageHeader Title="Projects" Subtitle="@(_isAdmin ? "All projects in your organization" : "Projects you own or were added to")">
+    <Actions>
+        @if (_isAdmin)
+        {
+            <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+                <Icon Name="plus" /> Create project
+            </button>
+        }
+    </Actions>
+</PageHeader>
 
 @if (_loading)
 {
@@ -22,85 +31,96 @@ else if (_error is not null)
 }
 else
 {
-    @if (_isAdmin)
-    {
-        @if (_createError is not null)
-        {
-            <div class="alert alert-danger" role="alert">@_createError</div>
-        }
+    <FilterTabs Label="Filter projects" Items="Tabs" Value="@_tab" ValueChanged="SetTab" />
 
-        <section class="card mb-4">
-            <div class="card-body">
-                <h2 class="h5 card-title">New project</h2>
-                <EditForm Model="_newProject" OnValidSubmit="CreateAsync">
-                    <DataAnnotationsValidator />
-                    <div class="row g-3">
-                        <div class="col-12 col-lg-5">
-                            <label class="form-label" for="project-name">Name</label>
-                            <InputText id="project-name" class="form-control" @bind-Value="_newProject.Name" />
-                            <div class="field-message"><ValidationMessage For="() => _newProject.Name" /></div>
-                        </div>
-                        <div class="col-12 col-lg-7">
-                            <label class="form-label" for="project-owner">Owner</label>
-                            <InputSelect id="project-owner" class="form-select" @bind-Value="_newProject.OwnerUserId">
-                                <option value="">Me</option>
-                                @foreach (var user in _owners)
+    <div class="toolbar">
+        <SearchBox Value="@_search" ValueChanged="SetSearch" Placeholder="Project name or owner..." />
+    </div>
+
+    <div class="table-card">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Project</th>
+                        <th scope="col">Owner</th>
+                        <th scope="col">Tasks</th>
+                        <th scope="col">Your access</th>
+                        <th scope="col">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Filtered.Count == 0)
+                    {
+                        <tr><td colspan="5" class="empty-cell">@EmptyMessage</td></tr>
+                    }
+                    @foreach (var project in Paging.Slice(Filtered, _page))
+                    {
+                        <tr @key="project.Id" class="row-link" @onclick="() => Open(project)">
+                            <td>
+                                <a class="cell-title" href="projects/@project.Id" @onclick:stopPropagation="true">@project.Name</a>
+                                @if (!string.IsNullOrWhiteSpace(project.Description))
                                 {
-                                    <option value="@user.Id">@user.Email</option>
+                                    <span class="cell-sub">@project.Description</span>
                                 }
-                            </InputSelect>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label" for="project-description">Description</label>
-                            <InputTextArea id="project-description" class="form-control" rows="2" @bind-Value="_newProject.Description" />
-                            <div class="field-message"><ValidationMessage For="() => _newProject.Description" /></div>
-                        </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-primary" disabled="@_creating">
-                                @(_creating ? "Creating..." : "Create project")
-                            </button>
-                        </div>
-                    </div>
-                </EditForm>
-            </div>
-        </section>
-    }
-
-    @if (_projects.Count == 0)
-    {
-        <p class="text-muted">
-            @(_isAdmin ? "No projects yet." : "You have not been added to any projects yet.")
-        </p>
-    }
-    else
-    {
-        <div class="list-group">
-            @foreach (var project in _projects)
-            {
-                <a @key="project.Id" href="projects/@project.Id"
-                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3">
-                    <span class="text-break">
-                        <span class="fw-semibold d-block">@project.Name</span>
-                        @if (!string.IsNullOrWhiteSpace(project.Description))
-                        {
-                            <small class="text-muted d-block">@project.Description</small>
-                        }
-                        <small class="text-muted">Owner: @project.OwnerEmail</small>
-                    </span>
-                    <span class="badge bg-secondary rounded-pill text-nowrap">
-                        @project.TaskCount @(project.TaskCount == 1 ? "task" : "tasks")
-                    </span>
-                </a>
-            }
+                            </td>
+                            <td class="nowrap">@project.OwnerEmail</td>
+                            <td class="nowrap">@project.TaskCount @(project.TaskCount == 1 ? "task" : "tasks")</td>
+                            <td><span class="pill @AccessClass(project)">@AccessLabel(project)</span></td>
+                            <td class="nowrap">@project.CreatedAtUtc.ToString("d MMM yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
-    }
+        <Pager Total="Filtered.Count" Page="_page" PageChanged="p => _page = p" />
+    </div>
 }
+
+<Modal Open="_showCreate" Title="Create project" Busy="_creating" OnClose="() => _showCreate = false">
+    @if (_createError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_createError</div>
+    }
+    <EditForm Model="_newProject" OnValidSubmit="CreateAsync">
+        <DataAnnotationsValidator />
+        <div class="mb-1">
+            <label class="form-label" for="project-name">Name</label>
+            <InputText id="project-name" class="form-control" @bind-Value="_newProject.Name" />
+            <div class="field-message"><ValidationMessage For="() => _newProject.Name" /></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="project-owner">Owner</label>
+            <InputSelect id="project-owner" class="form-select" @bind-Value="_newProject.OwnerUserId">
+                <option value="">Me</option>
+                @foreach (var user in _owners)
+                {
+                    <option value="@user.Id">@user.Email</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-1">
+            <label class="form-label" for="project-description">Description</label>
+            <InputTextArea id="project-description" class="form-control" rows="3" @bind-Value="_newProject.Description" />
+            <div class="field-message"><ValidationMessage For="() => _newProject.Description" /></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@_creating" @onclick="() => _showCreate = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled="@_creating">@(_creating ? "Creating..." : "Create project")</button>
+        </div>
+    </EditForm>
+</Modal>
 
 @code {
     private List<ProjectDto> _projects = [];
     private List<UserDto> _owners = [];
     private NewProjectModel _newProject = new();
+    private string _tab = "all";
+    private string _search = string.Empty;
+    private string? _currentUserId;
+    private int _page = 1;
     private bool _loading = true;
+    private bool _showCreate;
     private bool _creating;
     private bool _isAdmin;
     private string? _error;
@@ -109,9 +129,28 @@ else
     [CascadingParameter]
     private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
 
+    private IReadOnlyList<FilterTab> Tabs =>
+    [
+        new("all", "All", _projects.Count),
+        new("owned", "Owned by me", _projects.Count(IsOwned)),
+        new("shared", "Others", _projects.Count(p => !IsOwned(p)))
+    ];
+
+    private List<ProjectDto> Filtered => _projects
+        .Where(p => _tab switch { "owned" => IsOwned(p), "shared" => !IsOwned(p), _ => true })
+        .Where(p => _search.Length == 0
+            || p.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
+            || p.OwnerEmail.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    private string EmptyMessage => _projects.Count > 0
+        ? "No projects match these filters."
+        : _isAdmin ? "No projects yet. Create the first one." : "You have not been added to any projects yet.";
+
     protected override async Task OnInitializedAsync()
     {
         var state = await AuthenticationState;
+        _currentUserId = state.User.FindFirst("sub")?.Value;
         _isAdmin = (await Authorization.AuthorizeAsync(state.User, WebPolicies.OrganizationAdmin)).Succeeded;
         await LoadAsync();
     }
@@ -148,6 +187,29 @@ else
         _loading = false;
     }
 
+    private bool IsOwned(ProjectDto project) => project.OwnerUserId == _currentUserId;
+
+    private void SetTab(string tab)
+    {
+        _tab = tab;
+        _page = 1;
+    }
+
+    private void SetSearch(string search)
+    {
+        _search = search.Trim();
+        _page = 1;
+    }
+
+    private void Open(ProjectDto project) => Navigation.NavigateTo($"projects/{project.Id}");
+
+    private void OpenCreate()
+    {
+        _createError = null;
+        _newProject = new NewProjectModel();
+        _showCreate = true;
+    }
+
     private async Task CreateAsync()
     {
         _createError = null;
@@ -161,6 +223,7 @@ else
         _creating = false;
         if (result.IsSuccess)
         {
+            _showCreate = false;
             Navigation.NavigateTo($"projects/{result.Value.Id}");
         }
         else
@@ -168,6 +231,22 @@ else
             _createError = result.Error;
         }
     }
+
+    private static string AccessLabel(ProjectDto project) => project.Permissions switch
+    {
+        { CanManageMembers: true } => "Owner",
+        { CanDelete: true } => "Admin",
+        { CanManageTasks: true } => "Contributor",
+        _ => "Viewer"
+    };
+
+    private static string AccessClass(ProjectDto project) => project.Permissions switch
+    {
+        { CanManageMembers: true } => "pill-success",
+        { CanDelete: true } => "pill-warning",
+        { CanManageTasks: true } => "pill-info",
+        _ => string.Empty
+    };
 
     private sealed class NewProjectModel
     {

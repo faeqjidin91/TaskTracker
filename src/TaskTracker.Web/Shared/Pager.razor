@@ -1,0 +1,27 @@
+<div class="table-footer">
+    <span data-testid="table-total">@Total total</span>
+    <div class="pager">
+        <button type="button" class="icon-button" aria-label="Previous page" disabled="@(Current <= 1)"
+                @onclick="() => PageChanged.InvokeAsync(Current - 1)">
+            <Icon Name="chevron-left" Size="16" />
+        </button>
+        <span>Page @Current of @Paging.TotalPages(Total)</span>
+        <button type="button" class="icon-button" aria-label="Next page" disabled="@(Current >= Paging.TotalPages(Total))"
+                @onclick="() => PageChanged.InvokeAsync(Current + 1)">
+            <Icon Name="chevron-right" Size="16" />
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Total { get; set; }
+
+    [Parameter]
+    public int Page { get; set; } = 1;
+
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    private int Current => Paging.Clamp(Page, Total);
+}

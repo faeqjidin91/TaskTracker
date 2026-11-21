@@ -2,30 +2,66 @@
 @inject AuthService Auth
 @inject NavigationManager Navigation
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<AuthorizeView>
+    <Authorized>
+        @{
+            var email = context.User.Identity?.Name ?? string.Empty;
+            var role = context.User.FindFirst("role")?.Value ?? context.User.FindFirst("org_role")?.Value;
+            var organization = context.User.FindFirst("org_name")?.Value ?? "Platform";
+        }
+        <div class="app-shell @(_navOpen ? "nav-open" : null)">
+            <aside class="sidebar">
+                <a class="sidebar-brand" href="" @onclick="CloseNav">
+                    <span class="brand-mark"><Icon Name="check" Size="18" /></span>
+                    TaskTracker
+                </a>
+                <div class="org-chip" title="@organization" data-testid="user-organization">@organization</div>
 
-    <main>
-        <div class="top-row px-4">
-            <AuthorizeView>
-                <Authorized>
-                    <span class="me-2 text-muted d-none d-md-inline" data-testid="user-organization">@context.User.FindFirst("org_name")?.Value</span>
-                    <a href="account" class="me-2 text-muted user-email" title="@context.User.Identity?.Name" data-testid="user-email">@context.User.Identity?.Name</a>
-                    <span class="badge bg-secondary me-3" data-testid="user-role">@(context.User.FindFirst("role")?.Value ?? context.User.FindFirst("org_role")?.Value)</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LogoutAsync">Logout</button>
-                </Authorized>
-            </AuthorizeView>
+                <NavMenu OnNavigate="CloseNav" />
+
+                <div class="sidebar-footer">
+                    <ThemeSwitcher />
+                    <a class="user-card" href="account" title="Account settings" @onclick="CloseNav">
+                        <span class="avatar" aria-hidden="true">@(email.Length > 0 ? char.ToUpperInvariant(email[0]) : '?')</span>
+                        <span class="user-meta">
+                            <span class="user-email" title="@email" data-testid="user-email">@email</span>
+                            <span class="user-role" data-testid="user-role">@role</span>
+                        </span>
+                    </a>
+                    <button type="button" class="sign-out" @onclick="LogoutAsync">
+                        <Icon Name="log-out" /> Sign out
+                    </button>
+                </div>
+            </aside>
+
+            <button type="button" class="nav-scrim" aria-label="Close navigation" @onclick="CloseNav"></button>
+
+            <div class="main-area">
+                <div class="mobile-bar">
+                    <button type="button" class="icon-button" aria-label="Open navigation" @onclick="() => _navOpen = true">
+                        <Icon Name="menu" Size="22" />
+                    </button>
+                    <a class="sidebar-brand" href="">
+                        <span class="brand-mark"><Icon Name="check" Size="18" /></span>
+                        TaskTracker
+                    </a>
+                </div>
+                <main class="page">
+                    @Body
+                </main>
+            </div>
         </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    </Authorized>
+    <NotAuthorized>
+        @Body
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
+    private bool _navOpen;
+
+    private void CloseNav() => _navOpen = false;
+
     private async Task LogoutAsync()
     {
         await Auth.LogoutAsync();

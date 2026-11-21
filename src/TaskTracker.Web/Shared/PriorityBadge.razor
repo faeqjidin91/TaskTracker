@@ -1,0 +1,13 @@
+<span class="pill @CssClass">@Priority</span>
+
+@code {
+    [Parameter]
+    public TaskPriority Priority { get; set; }
+
+    private string CssClass => Priority switch
+    {
+        TaskPriority.High => "pill-danger",
+        TaskPriority.Medium => "pill-warning",
+        _ => string.Empty
+    };
+}

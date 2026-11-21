@@ -1,0 +1,16 @@
+<span class="pill @CssClass">@Label(Status)</span>
+
+@code {
+    [Parameter]
+    public TaskItemStatus Status { get; set; }
+
+    public static string Label(TaskItemStatus status) =>
+        status == TaskItemStatus.InProgress ? "In progress" : status == TaskItemStatus.Todo ? "To do" : status.ToString();
+
+    private string CssClass => Status switch
+    {
+        TaskItemStatus.Done => "pill-success",
+        TaskItemStatus.InProgress => "pill-info",
+        _ => string.Empty
+    };
+}

@@ -4,7 +4,13 @@
 
 <PageTitle>Users - TaskTracker</PageTitle>
 
-<h1 class="h3 mb-3" tabindex="-1">Users</h1>
+<PageHeader Title="Users" Subtitle="People in your organization and their roles">
+    <Actions>
+        <button type="button" class="btn btn-primary" @onclick="OpenAdd">
+            <Icon Name="plus" /> Add user
+        </button>
+    </Actions>
+</PageHeader>
 
 @if (_loading)
 {
@@ -34,133 +40,185 @@ else
         </div>
     }
 
-    <section class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">Add user</h2>
-            <EditForm Model="_newUser" OnValidSubmit="AddUserAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-lg-5">
-                        <label class="form-label" for="user-email">Email</label>
-                        <InputText id="user-email" type="email" class="form-control" autocomplete="off" @bind-Value="_newUser.Email" />
-                        <div class="field-message"><ValidationMessage For="() => _newUser.Email" /></div>
-                    </div>
-                    <div class="col-12 col-sm-8 col-lg-4">
-                        <label class="form-label" for="user-password">Temporary password</label>
-                        <InputText id="user-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_newUser.Password" />
-                        <div class="field-message"><ValidationMessage For="() => _newUser.Password" /></div>
-                    </div>
-                    <div class="col-12 col-sm-4 col-lg-3">
-                        <label class="form-label" for="user-role">Role</label>
-                        <InputSelect id="user-role" class="form-select" @bind-Value="_newUser.Role">
-                            @foreach (var role in Enum.GetValues<OrganizationRole>())
-                            {
-                                <option value="@role">@role</option>
-                            }
-                        </InputSelect>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary" disabled="@_adding">
-                            @(_adding ? "Adding..." : "Add user")
-                        </button>
-                    </div>
-                </div>
-            </EditForm>
-        </div>
-    </section>
+    <FilterTabs Label="Filter users" Items="Tabs" Value="@_tab" ValueChanged="SetTab" />
 
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th scope="col">Email</th>
-                    <th scope="col">Role</th>
-                    <th scope="col">Status</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var user in _users)
-                {
-                    var isSelf = IsSelf(user);
-                    var busy = _busyUserIds.Contains(user.Id);
+    <div class="toolbar">
+        <SearchBox Value="@_search" ValueChanged="SetSearch" Placeholder="Search by email..." />
+    </div>
 
-                    <tr @key="user.Id">
-                        <td>
-                            @user.Email
-                            @if (isSelf)
-                            {
-                                <small class="text-muted">(you)</small>
-                            }
-                        </td>
-                        <td>
-                            <select class="form-select form-select-sm" aria-label="Role for @user.Email"
-                                    value="@user.Role.ToString()" disabled="@(isSelf || busy)"
-                                    @onchange="e => ChangeRoleAsync(user, e)">
-                                @foreach (var role in Enum.GetValues<OrganizationRole>())
-                                {
-                                    <option value="@role.ToString()">@role</option>
-                                }
-                            </select>
-                        </td>
-                        <td>
-                            <span class="badge @(user.IsActive ? "bg-success" : "bg-secondary")">
-                                @(user.IsActive ? "Active" : "Inactive")
-                            </span>
-                        </td>
-                        <td class="text-end text-nowrap">
-                            @if (!isSelf)
-                            {
-                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" disabled="@busy"
-                                        aria-label="Reset password for @user.Email" @onclick="() => OpenReset(user)">Reset password</button>
-                                <button type="button" class="btn btn-sm @(user.IsActive ? "btn-outline-danger" : "btn-outline-success")"
-                                        disabled="@busy" aria-label="@(user.IsActive ? "Deactivate" : "Activate") @user.Email"
-                                        @onclick="() => ToggleActiveAsync(user)">
-                                    @(user.IsActive ? "Deactivate" : "Activate")
-                                </button>
-                            }
-                        </td>
+    <div class="table-card">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">User</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Status</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
                     </tr>
-
-                    @if (_resetUserId == user.Id)
+                </thead>
+                <tbody>
+                    @if (Filtered.Count == 0)
                     {
-                        <tr @key="ResetRowKey(user)">
-                            <td colspan="4">
-                                <EditForm Model="_reset" OnValidSubmit="() => ResetPasswordAsync(user)">
-                                    <DataAnnotationsValidator />
-                                    <label class="form-label" for="reset-password">New password for @user.Email</label>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <InputText id="reset-password" type="password" class="form-control w-auto flex-grow-1"
-                                                   autocomplete="new-password" @bind-Value="_reset.Password" />
-                                        <button type="submit" class="btn btn-primary" disabled="@busy">Save password</button>
-                                        <button type="button" class="btn btn-outline-secondary" @onclick="() => _resetUserId = null">Cancel</button>
-                                    </div>
-                                    <div class="field-message"><ValidationMessage For="() => _reset.Password" /></div>
-                                </EditForm>
+                        <tr><td colspan="4" class="empty-cell">No users match these filters.</td></tr>
+                    }
+                    @foreach (var user in Paging.Slice(Filtered, _page))
+                    {
+                        var isSelf = IsSelf(user);
+                        var busy = _busyUserIds.Contains(user.Id);
+
+                        <tr @key="user.Id">
+                            <td>
+                                <span class="cell-title">@user.Email</span>
+                                @if (isSelf)
+                                {
+                                    <small class="text-muted ms-1">(you)</small>
+                                }
+                            </td>
+                            <td>
+                                <select class="form-select form-select-sm" aria-label="Role for @user.Email"
+                                        value="@user.Role.ToString()" disabled="@(isSelf || busy)"
+                                        @onchange="e => ChangeRoleAsync(user, e)">
+                                    @foreach (var role in Enum.GetValues<OrganizationRole>())
+                                    {
+                                        <option value="@role.ToString()">@role</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <span class="pill @(user.IsActive ? "pill-success" : null)">
+                                    @(user.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td class="cell-actions">
+                                @if (!isSelf)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-1" disabled="@busy"
+                                            aria-label="Reset password for @user.Email" @onclick="() => OpenReset(user)">
+                                        <Icon Name="key" Size="14" /> Reset password
+                                    </button>
+                                    <button type="button" class="btn btn-sm @(user.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                                            disabled="@busy" aria-label="@(user.IsActive ? "Deactivate" : "Activate") @user.Email"
+                                            @onclick="() => AskToggle(user)">
+                                        @(user.IsActive ? "Deactivate" : "Activate")
+                                    </button>
+                                }
                             </td>
                         </tr>
                     }
-                }
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
+        <Pager Total="Filtered.Count" Page="_page" PageChanged="p => _page = p" />
     </div>
 }
+
+<Modal Open="_showAdd" Title="Add user" Busy="_adding" OnClose="() => _showAdd = false">
+    @if (_addError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_addError</div>
+    }
+    <EditForm Model="_newUser" OnValidSubmit="AddUserAsync">
+        <DataAnnotationsValidator />
+        <div class="mb-1">
+            <label class="form-label" for="user-email">Email</label>
+            <InputText id="user-email" type="email" class="form-control" autocomplete="off" @bind-Value="_newUser.Email" />
+            <div class="field-message"><ValidationMessage For="() => _newUser.Email" /></div>
+        </div>
+        <div class="mb-1">
+            <label class="form-label" for="user-password">Temporary password</label>
+            <InputText id="user-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_newUser.Password" />
+            <div class="field-message"><ValidationMessage For="() => _newUser.Password" /></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="user-role">Role</label>
+            <InputSelect id="user-role" class="form-select" @bind-Value="_newUser.Role">
+                @foreach (var role in Enum.GetValues<OrganizationRole>())
+                {
+                    <option value="@role">@role</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@_adding" @onclick="() => _showAdd = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled="@_adding">@(_adding ? "Adding..." : "Add user")</button>
+        </div>
+    </EditForm>
+</Modal>
+
+<Modal Open="_resetTarget is not null" Title="@($"Reset password for {_resetTarget?.Email}")" Busy="_resetting" OnClose="() => _resetTarget = null">
+    @if (_resetError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_resetError</div>
+    }
+    <EditForm Model="_reset" OnValidSubmit="ResetPasswordAsync">
+        <DataAnnotationsValidator />
+        <div class="mb-1">
+            <label class="form-label" for="reset-password">New password</label>
+            <InputText id="reset-password" type="password" class="form-control" autocomplete="new-password" @bind-Value="_reset.Password" />
+            <div class="field-message"><ValidationMessage For="() => _reset.Password" /></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@_resetting" @onclick="() => _resetTarget = null">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled="@_resetting">@(_resetting ? "Saving..." : "Save password")</button>
+        </div>
+    </EditForm>
+</Modal>
+
+<ConfirmDialog Open="_toggleTarget is not null"
+               Title="@(_toggleTarget?.IsActive == true ? "Deactivate user" : "Activate user")"
+               Message="@(_toggleTarget?.IsActive == true ? $"Deactivate {_toggleTarget.Email}? They will be signed out immediately." : $"Activate {_toggleTarget?.Email}?")"
+               ConfirmLabel="@(_toggleTarget?.IsActive == true ? "Deactivate" : "Activate")"
+               Danger="@(_toggleTarget?.IsActive == true)"
+               Busy="_toggling"
+               Error="@_toggleError"
+               OnConfirm="ToggleActiveAsync"
+               OnCancel="() => _toggleTarget = null" />
 
 @code {
     private readonly HashSet<string> _busyUserIds = [];
     private List<UserDto> _users = [];
     private NewUserModel _newUser = new();
     private ResetModel _reset = new();
+    private UserDto? _resetTarget;
+    private UserDto? _toggleTarget;
+    private string _tab = "all";
+    private string _search = string.Empty;
     private string? _currentUserId;
-    private string? _resetUserId;
     private string? _loadError;
     private string? _actionError;
+    private string? _addError;
+    private string? _resetError;
+    private string? _toggleError;
     private string? _success;
+    private int _page = 1;
     private bool _loading = true;
+    private bool _showAdd;
     private bool _adding;
+    private bool _resetting;
+    private bool _toggling;
 
     [CascadingParameter]
     private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    private IReadOnlyList<FilterTab> Tabs =>
+    [
+        new("all", "All", _users.Count),
+        new("active", "Active", _users.Count(u => u.IsActive)),
+        new("inactive", "Inactive", _users.Count(u => !u.IsActive)),
+        new("admins", "Admins", _users.Count(u => u.Role == OrganizationRole.Admin))
+    ];
+
+    private List<UserDto> Filtered => _users
+        .Where(u => _tab switch
+        {
+            "active" => u.IsActive,
+            "inactive" => !u.IsActive,
+            "admins" => u.Role == OrganizationRole.Admin,
+            _ => true
+        })
+        .Where(u => _search.Length == 0 || u.Email.Contains(_search, StringComparison.OrdinalIgnoreCase))
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -187,9 +245,29 @@ else
         _loading = false;
     }
 
-    private async Task AddUserAsync()
+    private void SetTab(string tab)
+    {
+        _tab = tab;
+        _page = 1;
+    }
+
+    private void SetSearch(string search)
+    {
+        _search = search.Trim();
+        _page = 1;
+    }
+
+    private void OpenAdd()
     {
         ClearMessages();
+        _addError = null;
+        _newUser = new NewUserModel();
+        _showAdd = true;
+    }
+
+    private async Task AddUserAsync()
+    {
+        _addError = null;
         _adding = true;
 
         var result = await UsersApi.CreateAsync(
@@ -201,11 +279,11 @@ else
             _users.Add(result.Value);
             _users = _users.OrderBy(u => u.Email, StringComparer.OrdinalIgnoreCase).ToList();
             _success = $"Added {result.Value.Email}.";
-            _newUser = new NewUserModel();
+            _showAdd = false;
         }
         else
         {
-            _actionError = result.Error;
+            _addError = result.Error;
         }
     }
 
@@ -230,48 +308,69 @@ else
         }
     }
 
-    private async Task ToggleActiveAsync(UserDto user)
+    private void AskToggle(UserDto user)
     {
         ClearMessages();
+        _toggleError = null;
+        _toggleTarget = user;
+    }
+
+    private async Task ToggleActiveAsync()
+    {
+        if (_toggleTarget is not { } user)
+        {
+            return;
+        }
+
+        _toggleError = null;
+        _toggling = true;
         _busyUserIds.Add(user.Id);
 
         var result = await UsersApi.UpdateStatusAsync(user.Id, !user.IsActive);
+
         _busyUserIds.Remove(user.Id);
+        _toggling = false;
 
         if (result.IsSuccess)
         {
             ReplaceUser(user with { IsActive = !user.IsActive });
+            _toggleTarget = null;
         }
         else
         {
-            _actionError = result.Error;
+            _toggleError = result.Error;
         }
     }
 
     private void OpenReset(UserDto user)
     {
         ClearMessages();
+        _resetError = null;
         _reset = new ResetModel();
-        _resetUserId = user.Id;
+        _resetTarget = user;
     }
 
-    private async Task ResetPasswordAsync(UserDto user)
+    private async Task ResetPasswordAsync()
     {
-        ClearMessages();
-        _busyUserIds.Add(user.Id);
+        if (_resetTarget is not { } user)
+        {
+            return;
+        }
+
+        _resetError = null;
+        _resetting = true;
 
         var result = await UsersApi.ResetPasswordAsync(user.Id, _reset.Password);
-        _busyUserIds.Remove(user.Id);
 
+        _resetting = false;
         if (result.IsSuccess)
         {
-            _resetUserId = null;
-            _reset = new ResetModel();
+            _resetTarget = null;
             _success = $"Password reset for {user.Email}.";
         }
         else
         {
-            _actionError = result.Error;
+            _resetError = result.Error;
         }
     }
 
@@ -292,8 +391,6 @@ else
 
     private bool IsSelf(UserDto user) =>
         string.Equals(user.Id, _currentUserId, StringComparison.OrdinalIgnoreCase);
-
-    private static string ResetRowKey(UserDto user) => $"reset-{user.Id}";
 
     private sealed class NewUserModel
     {

@@ -1,72 +1,97 @@
 @inject ProjectApiClient ProjectsApi
 
-<details class="card mb-4" data-testid="project-settings">
-    <summary class="card-header">Project settings</summary>
-    <div class="card-body">
-        @if (_error is not null)
-        {
-            <div class="alert alert-danger" role="alert">@_error</div>
-        }
+<div class="narrow" data-testid="project-settings">
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (_saved)
+    {
+        <div class="alert alert-success" role="status">Changes saved.</div>
+    }
 
-        @if (Project.Permissions.CanEdit)
-        {
-            <EditForm Model="_details" OnValidSubmit="SaveAsync" class="mb-4">
+    @if (Project.Permissions.CanEdit)
+    {
+        <section class="panel">
+            <h2>Project details</h2>
+            <p class="panel-note">The name and description everyone on the project sees.</p>
+            <EditForm Model="_details" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
-                <div class="mb-2">
+                <div class="mb-1">
                     <label class="form-label" for="settings-name">Project name</label>
                     <InputText id="settings-name" class="form-control" @bind-Value="_details.Name" />
                     <div class="field-message"><ValidationMessage For="() => _details.Name" /></div>
                 </div>
-                <div class="mb-2">
+                <div class="mb-1">
                     <label class="form-label" for="settings-description">Project description</label>
-                    <InputTextArea id="settings-description" class="form-control" rows="2" @bind-Value="_details.Description" />
+                    <InputTextArea id="settings-description" class="form-control" rows="3" @bind-Value="_details.Description" />
                     <div class="field-message"><ValidationMessage For="() => _details.Description" /></div>
                 </div>
                 <button type="submit" class="btn btn-primary" disabled="@_busy">Save changes</button>
             </EditForm>
-        }
+        </section>
+    }
 
-        @if (Project.Permissions.CanTransferOwner)
-        {
-            <div class="mb-4">
-                <label class="form-label" for="settings-owner">Transfer ownership</label>
-                <div class="d-flex flex-wrap gap-2">
-                    <select id="settings-owner" class="form-select w-auto flex-grow-1" @bind="_newOwnerId">
-                        <option value="">Select a new owner</option>
-                        @foreach (var candidate in _candidates.Where(c => c.UserId != Project.OwnerUserId))
-                        {
-                            <option value="@candidate.UserId">@candidate.Email</option>
-                        }
-                    </select>
-                    <button type="button" class="btn btn-outline-primary"
-                            disabled="@(_busy || string.IsNullOrEmpty(_newOwnerId))" @onclick="TransferAsync">Transfer</button>
-                </div>
+    @if (Project.Permissions.CanTransferOwner)
+    {
+        <section class="panel">
+            <h2>Transfer ownership</h2>
+            <p class="panel-note">Only the owner can assign members. The previous owner stays on the project as a Contributor.</p>
+            <label class="form-label" for="settings-owner">New owner</label>
+            <div class="d-flex flex-wrap gap-2">
+                <select id="settings-owner" class="form-select w-auto flex-grow-1" @bind="_newOwnerId">
+                    <option value="">Select a new owner</option>
+                    @foreach (var candidate in _candidates.Where(c => c.UserId != Project.OwnerUserId))
+                    {
+                        <option value="@candidate.UserId">@candidate.Email</option>
+                    }
+                </select>
+                <button type="button" class="btn btn-outline-secondary"
+                        disabled="@(_busy || string.IsNullOrEmpty(_newOwnerId))" @onclick="() => _confirmingTransfer = true">Transfer</button>
             </div>
-        }
+        </section>
+    }
 
-        @if (Project.Permissions.CanDelete)
-        {
-            @if (_confirmingDelete)
-            {
-                <span class="me-2">Delete this project and all its tasks?</span>
-                <button type="button" class="btn btn-sm btn-danger me-1" disabled="@_busy" @onclick="DeleteAsync">Yes, delete project</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _confirmingDelete = false">Cancel</button>
-            }
-            else
-            {
-                <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmingDelete = true">Delete project</button>
-            }
-        }
-    </div>
-</details>
+    @if (Project.Permissions.CanDelete)
+    {
+        <section class="panel panel-danger">
+            <h2>Delete project</h2>
+            <p class="panel-note">Permanently removes this project, its tasks, and its member list.</p>
+            <button type="button" class="btn btn-outline-danger" @onclick="() => _confirmingDelete = true">
+                <Icon Name="trash" Size="16" /> Delete project
+            </button>
+        </section>
+    }
+</div>
+
+<ConfirmDialog Open="_confirmingTransfer"
+               Title="Transfer ownership"
+               Message="@($"Make {NewOwnerEmail} the owner of {Project.Name}?")"
+               ConfirmLabel="Transfer ownership"
+               Danger="false"
+               Busy="_busy"
+               OnConfirm="TransferAsync"
+               OnCancel="() => _confirmingTransfer = false" />
+
+<ConfirmDialog Open="_confirmingDelete"
+               Title="Delete project"
+               Message="@($"Delete {Project.Name} and all its tasks? This cannot be undone.")"
+               ConfirmLabel="Yes, delete project"
+               Busy="_busy"
+               Error="@_deleteError"
+               OnConfirm="DeleteAsync"
+               OnCancel="CancelDelete" />
 
 @code {
     private DetailsModel _details = new();
     private List<ProjectCandidateDto> _candidates = [];
     private string _newOwnerId = string.Empty;
+    private bool _confirmingTransfer;
     private bool _confirmingDelete;
     private bool _busy;
+    private bool _saved;
     private string? _error;
+    private string? _deleteError;
 
     [Parameter, EditorRequired]
     public ProjectDto Project { get; set; } = default!;
@@ -76,6 +101,9 @@
 
     [Parameter]
     public EventCallback OnDeleted { get; set; }
+
+    private string NewOwnerEmail =>
+        _candidates.FirstOrDefault(c => c.UserId == _newOwnerId)?.Email ?? "this user";
 
     protected override async Task OnInitializedAsync()
     {
@@ -98,6 +126,7 @@
     private async Task SaveAsync()
     {
         _error = null;
+        _saved = false;
         _busy = true;
 
         var result = await ProjectsApi.UpdateAsync(Project.Id, new UpdateProjectRequest(
@@ -107,6 +136,7 @@
         _busy = false;
         if (result.IsSuccess)
         {
+            _saved = true;
             await OnChanged.InvokeAsync();
         }
         else
@@ -118,11 +148,14 @@
     private async Task TransferAsync()
     {
         _error = null;
+        _saved = false;
         _busy = true;
 
         var result = await ProjectsApi.TransferOwnerAsync(Project.Id, _newOwnerId);
 
         _busy = false;
+        _confirmingTransfer = false;
+
         if (result.IsSuccess)
         {
             await OnChanged.InvokeAsync();
@@ -133,9 +166,15 @@
         }
     }
 
+    private void CancelDelete()
+    {
+        _deleteError = null;
+        _confirmingDelete = false;
+    }
+
     private async Task DeleteAsync()
     {
-        _error = null;
+        _deleteError = null;
         _busy = true;
 
         var result = await ProjectsApi.DeleteAsync(Project.Id);
@@ -143,12 +182,12 @@
         _busy = false;
         if (result.IsSuccess)
         {
+            _confirmingDelete = false;
             await OnDeleted.InvokeAsync();
         }
         else
         {
-            _confirmingDelete = false;
-            _error = result.Error;
+            _deleteError = result.Error;
         }
     }
 

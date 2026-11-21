@@ -4,9 +4,14 @@
 
 <PageTitle>Log in - TaskTracker</PageTitle>
 
-<div class="row justify-content-center">
-    <div class="col-12 col-sm-10 col-md-7 col-lg-5">
-        <h1 class="h3 mb-3" tabindex="-1">Log in</h1>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="sidebar-brand">
+            <span class="brand-mark"><Icon Name="check" Size="18" /></span>
+            TaskTracker
+        </div>
+        <h1 tabindex="-1">Log in</h1>
+        <p>Sign in to manage your projects and tasks.</p>
 
         @if (_error is not null)
         {
@@ -16,13 +21,13 @@
         <EditForm Model="_model" OnValidSubmit="SubmitAsync">
             <DataAnnotationsValidator />
 
-            <div class="mb-3">
+            <div class="mb-1">
                 <label class="form-label" for="email">Email</label>
                 <InputText id="email" type="email" class="form-control" autocomplete="username" @bind-Value="_model.Email" />
                 <div class="field-message"><ValidationMessage For="() => _model.Email" /></div>
             </div>
 
-            <div class="mb-3">
+            <div class="mb-2">
                 <label class="form-label" for="password">Password</label>
                 <InputText id="password" type="password" class="form-control" autocomplete="current-password" @bind-Value="_model.Password" />
                 <div class="field-message"><ValidationMessage For="() => _model.Password" /></div>

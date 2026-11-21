@@ -6,14 +6,13 @@
 
 <PageTitle>@(_project?.Name ?? "Project") - TaskTracker</PageTitle>
 
-<a href="projects" class="d-inline-block mb-2">&larr; All projects</a>
-
 @if (_loading)
 {
     <LoadingSpinner />
 }
 else if (_loadError is not null || _project is null)
 {
+    <a href="projects" class="breadcrumb-link"><Icon Name="arrow-left" Size="15" /> All projects</a>
     <div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
         <span>@_loadError</span>
         <button type="button" class="btn btn-sm btn-outline-danger" @onclick="LoadAsync">Retry</button>
@@ -21,11 +20,28 @@ else if (_loadError is not null || _project is null)
 }
 else
 {
-    <h1 class="h3" tabindex="-1">@_project.Name</h1>
-    @if (!string.IsNullOrWhiteSpace(_project.Description))
-    {
-        <p class="text-muted">@_project.Description</p>
-    }
+    <PageHeader Title="@_project.Name" Subtitle="@_project.Description">
+        <Breadcrumb>
+            <a href="projects" class="breadcrumb-link"><Icon Name="arrow-left" Size="15" /> All projects</a>
+        </Breadcrumb>
+        <Actions>
+            @if (CanManageTasks && _view == "tasks")
+            {
+                <button type="button" class="btn btn-primary" @onclick="OpenCreate">
+                    <Icon Name="plus" /> Create task
+                </button>
+            }
+        </Actions>
+    </PageHeader>
+
+    <div class="section-tabs" role="group" aria-label="Project sections">
+        <button type="button" aria-pressed="@Pressed("tasks")" @onclick="@(() => _view = "tasks")">Tasks</button>
+        <button type="button" aria-pressed="@Pressed("members")" @onclick="@(() => _view = "members")">Members</button>
+        @if (CanSeeSettings)
+        {
+            <button type="button" aria-pressed="@Pressed("settings")" @onclick="@(() => _view = "settings")">Settings</button>
+        }
+    </div>
 
     @if (_actionError is not null)
     {
@@ -35,158 +51,224 @@ else
         </div>
     }
 
-    <ProjectMembersPanel @key="MembersPanelKey" Project="_project" />
-
-    @if (_project.Permissions.CanEdit || _project.Permissions.CanTransferOwner || _project.Permissions.CanDelete)
+    @if (_view == "members")
+    {
+        <ProjectMembersPanel @key="MembersPanelKey" Project="_project" />
+    }
+    else if (_view == "settings" && CanSeeSettings)
     {
         <ProjectSettingsPanel @key="SettingsPanelKey" Project="_project" OnChanged="LoadAsync" OnDeleted="OnProjectDeleted" />
     }
-
-    @if (_canManageTasks)
-    {
-    <section class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">Add task</h2>
-            <EditForm Model="_newTask" OnValidSubmit="AddTaskAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3">
-                    <div class="col-12 col-lg-6">
-                        <label class="form-label" for="task-title">Title</label>
-                        <InputText id="task-title" class="form-control" @bind-Value="_newTask.Title" />
-                        <div class="field-message"><ValidationMessage For="() => _newTask.Title" /></div>
-                    </div>
-                    <div class="col-6 col-lg-3">
-                        <label class="form-label" for="task-priority">Priority</label>
-                        <InputSelect id="task-priority" class="form-select" @bind-Value="_newTask.Priority">
-                            @foreach (var priority in Enum.GetValues<TaskPriority>())
-                            {
-                                <option value="@priority">@priority</option>
-                            }
-                        </InputSelect>
-                    </div>
-                    <div class="col-6 col-lg-3">
-                        <label class="form-label" for="task-due">Due date</label>
-                        <InputDate id="task-due" class="form-control" @bind-Value="_newTask.DueDate" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label" for="task-description">Description</label>
-                        <InputTextArea id="task-description" class="form-control" rows="2" @bind-Value="_newTask.Description" />
-                        <div class="field-message"><ValidationMessage For="() => _newTask.Description" /></div>
-                    </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary" disabled="@_adding">
-                            @(_adding ? "Adding..." : "Add task")
-                        </button>
-                    </div>
-                </div>
-            </EditForm>
-        </div>
-    </section>
-    }
-
-    <h2 class="h5">Tasks</h2>
-
-    @if (_tasks.Count == 0)
-    {
-        <p class="text-muted">No tasks yet.</p>
-    }
     else
     {
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th scope="col">Title</th>
-                        <th scope="col">Priority</th>
-                        <th scope="col">Due</th>
-                        <th scope="col">Status</th>
-                        @if (_canManageTasks)
-                        {
-                            <th scope="col"><span class="visually-hidden">Actions</span></th>
-                        }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var task in _tasks)
-                    {
-                        <tr @key="task.Id">
-                            <td>
-                                <span class="fw-semibold">@task.Title</span>
-                                @if (!string.IsNullOrWhiteSpace(task.Description))
-                                {
-                                    <small class="text-muted d-block">@task.Description</small>
-                                }
-                            </td>
-                            <td><span class="badge @PriorityClass(task.Priority)">@task.Priority</span></td>
-                            <td class="text-nowrap">@(task.DueDateUtc?.ToString("yyyy-MM-dd") ?? "-")</td>
-                            <td>
-                                @if (!_canManageTasks)
-                                {
-                                    <span class="badge bg-light text-dark border">@StatusLabel(task.Status)</span>
-                                }
-                                else
-                                {
-                                <select class="form-select form-select-sm" aria-label="Status for @task.Title"
-                                        value="@task.Status.ToString()" disabled="@_busyTaskIds.Contains(task.Id)"
-                                        @onchange="e => ChangeStatusAsync(task, e)">
-                                    @foreach (var status in Enum.GetValues<TaskItemStatus>())
-                                    {
-                                        <option value="@status.ToString()">@StatusLabel(status)</option>
-                                    }
-                                </select>
-                                }
-                            </td>
-                            @if (_canManageTasks)
+        <FilterTabs Label="Filter tasks by status" Items="StatusTabs" Value="@_statusTab" ValueChanged="SetStatusTab" />
+
+        <div class="toolbar">
+            <SearchBox Value="@_search" ValueChanged="SetSearch" Placeholder="Task title or description..." />
+            <select class="form-select" aria-label="Filter by priority" value="@_priorityFilter" @onchange="SetPriority">
+                <option value="">All priorities</option>
+                @foreach (var priority in Enum.GetValues<TaskPriority>())
+                {
+                    <option value="@priority">@priority</option>
+                }
+            </select>
+        </div>
+
+        <div class="table-card">
+            <div class="table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Task</th>
+                            <th scope="col">Priority</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Due</th>
+                            <th scope="col">Updated</th>
+                            @if (CanManageTasks)
                             {
-                            <td class="text-end text-nowrap">
-                                @if (_confirmDeleteId == task.Id)
-                                {
-                                    <span class="me-2">Delete?</span>
-                                    <button type="button" class="btn btn-sm btn-danger me-1"
-                                            disabled="@_busyTaskIds.Contains(task.Id)" @onclick="() => DeleteTaskAsync(task)">Yes</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary"
-                                            @onclick="() => _confirmDeleteId = null">No</button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-danger"
-                                            aria-label="Delete @task.Title" @onclick="() => _confirmDeleteId = task.Id">Delete</button>
-                                }
-                            </td>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
                             }
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @if (FilteredTasks.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="@(CanManageTasks ? 6 : 5)" class="empty-cell">
+                                    @(_tasks.Count == 0 ? "No tasks yet." : "No tasks match these filters.")
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var task in Paging.Slice(FilteredTasks, _page))
+                        {
+                            <tr @key="task.Id">
+                                <td>
+                                    <span class="cell-title">@task.Title</span>
+                                    @if (!string.IsNullOrWhiteSpace(task.Description))
+                                    {
+                                        <span class="cell-sub" title="@task.Description">@task.Description</span>
+                                    }
+                                </td>
+                                <td><PriorityBadge Priority="task.Priority" /></td>
+                                <td>
+                                    @if (CanManageTasks)
+                                    {
+                                        <select class="form-select form-select-sm" aria-label="Status for @task.Title"
+                                                value="@task.Status.ToString()" disabled="@_busyTaskIds.Contains(task.Id)"
+                                                @onchange="e => ChangeStatusAsync(task, e)">
+                                            @foreach (var status in Enum.GetValues<TaskItemStatus>())
+                                            {
+                                                <option value="@status.ToString()">@StatusBadge.Label(status)</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <StatusBadge Status="task.Status" />
+                                    }
+                                </td>
+                                <td class="nowrap @(IsOverdue(task) ? "overdue" : null)">@(task.DueDateUtc?.ToString("d MMM yyyy") ?? "-")</td>
+                                <td class="nowrap text-muted">@task.UpdatedAtUtc.ToLocalTime().ToString("d MMM yyyy, HH:mm")</td>
+                                @if (CanManageTasks)
+                                {
+                                    <td class="cell-actions">
+                                        <button type="button" class="icon-button danger" aria-label="Delete @task.Title"
+                                                title="Delete task" disabled="@_busyTaskIds.Contains(task.Id)"
+                                                @onclick="() => AskDelete(task)">
+                                            <Icon Name="trash" Size="16" />
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <Pager Total="FilteredTasks.Count" Page="_page" PageChanged="p => _page = p" />
         </div>
     }
 }
+
+<Modal Open="_showCreate" Title="Create task" Busy="_adding" OnClose="() => _showCreate = false">
+    @if (_createError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_createError</div>
+    }
+    <EditForm Model="_newTask" OnValidSubmit="AddTaskAsync">
+        <DataAnnotationsValidator />
+        <div class="mb-1">
+            <label class="form-label" for="task-title">Title</label>
+            <InputText id="task-title" class="form-control" @bind-Value="_newTask.Title" />
+            <div class="field-message"><ValidationMessage For="() => _newTask.Title" /></div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-6">
+                <label class="form-label" for="task-priority">Priority</label>
+                <InputSelect id="task-priority" class="form-select" @bind-Value="_newTask.Priority">
+                    @foreach (var priority in Enum.GetValues<TaskPriority>())
+                    {
+                        <option value="@priority">@priority</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="col-6">
+                <label class="form-label" for="task-due">Due date</label>
+                <InputDate id="task-due" class="form-control" @bind-Value="_newTask.DueDate" />
+            </div>
+        </div>
+        <div class="mb-1">
+            <label class="form-label" for="task-description">Description</label>
+            <InputTextArea id="task-description" class="form-control" rows="3" @bind-Value="_newTask.Description" />
+            <div class="field-message"><ValidationMessage For="() => _newTask.Description" /></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline-secondary" disabled="@_adding" @onclick="() => _showCreate = false">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled="@_adding">@(_adding ? "Creating..." : "Create task")</button>
+        </div>
+    </EditForm>
+</Modal>
+
+<ConfirmDialog Open="_deleteTarget is not null"
+               Title="Delete task"
+               Message="@($"Delete \"{_deleteTarget?.Title}\"? This cannot be undone.")"
+               ConfirmLabel="Delete task"
+               Busy="_deleting"
+               Error="@_deleteError"
+               OnConfirm="DeleteTaskAsync"
+               OnCancel="() => _deleteTarget = null" />
 
 @code {
     private readonly HashSet<int> _busyTaskIds = [];
     private ProjectDto? _project;
     private List<TaskDto> _tasks = [];
     private NewTaskModel _newTask = new();
+    private TaskDto? _deleteTarget;
+    private string _view = "tasks";
+    private string _statusTab = "active";
+    private string _priorityFilter = string.Empty;
+    private string _search = string.Empty;
+    private int _page = 1;
     private bool _loading = true;
+    private bool _showCreate;
     private bool _adding;
-    private int? _confirmDeleteId;
+    private bool _deleting;
     private string? _loadError;
     private string? _actionError;
+    private string? _createError;
+    private string? _deleteError;
 
     [Parameter]
     public int Id { get; set; }
 
-    private bool _canManageTasks => _project?.Permissions.CanManageTasks == true;
+    private bool CanManageTasks => _project?.Permissions.CanManageTasks == true;
+
+    private bool CanSeeSettings =>
+        _project?.Permissions is { } p && (p.CanEdit || p.CanTransferOwner || p.CanDelete);
 
     // Recreates the panels when ownership changes, because their permissions change with it.
     private string MembersPanelKey => $"members-{_project?.Id}-{_project?.OwnerUserId}";
     private string SettingsPanelKey => $"settings-{_project?.Id}-{_project?.OwnerUserId}";
 
+    private IReadOnlyList<FilterTab> StatusTabs =>
+    [
+        new("active", "Active", _tasks.Count(t => t.Status != TaskItemStatus.Done)),
+        new("todo", "To do", _tasks.Count(t => t.Status == TaskItemStatus.Todo)),
+        new("progress", "In progress", _tasks.Count(t => t.Status == TaskItemStatus.InProgress)),
+        new("overdue", "Overdue", _tasks.Count(IsOverdue)),
+        new("done", "Done", _tasks.Count(t => t.Status == TaskItemStatus.Done)),
+        new("all", "All", _tasks.Count)
+    ];
+
+    private List<TaskDto> FilteredTasks => _tasks
+        .Where(MatchesStatusTab)
+        .Where(t => _priorityFilter.Length == 0 || t.Priority.ToString() == _priorityFilter)
+        .Where(t => _search.Length == 0
+            || t.Title.Contains(_search, StringComparison.OrdinalIgnoreCase)
+            || (t.Description?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+        .ToList();
+
     protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private string Pressed(string view) => _view == view ? "true" : "false";
+
+    private bool MatchesStatusTab(TaskDto task) => _statusTab switch
+    {
+        "active" => task.Status != TaskItemStatus.Done,
+        "todo" => task.Status == TaskItemStatus.Todo,
+        "progress" => task.Status == TaskItemStatus.InProgress,
+        "overdue" => IsOverdue(task),
+        "done" => task.Status == TaskItemStatus.Done,
+        _ => true
+    };
+
+    // Due dates are calendar dates stored as UTC midnight.
+    private static bool IsOverdue(TaskDto task) =>
+        task.Status != TaskItemStatus.Done && task.DueDateUtc?.Date < DateTime.UtcNow.Date;
 
     private async Task LoadAsync()
     {
-        _loading = true;
+        // A background refresh keeps the page on screen, so only a new project shows the spinner.
+        _loading = _project?.Id != Id;
         _loadError = null;
         _actionError = null;
 
@@ -201,6 +283,11 @@ else
         {
             _project = project.Value;
             _tasks = tasks.Value;
+
+            if (_view == "settings" && !CanSeeSettings)
+            {
+                _view = "tasks";
+            }
         }
         else
         {
@@ -214,9 +301,34 @@ else
 
     private void OnProjectDeleted() => Navigation.NavigateTo("projects");
 
+    private void SetStatusTab(string tab)
+    {
+        _statusTab = tab;
+        _page = 1;
+    }
+
+    private void SetSearch(string search)
+    {
+        _search = search.Trim();
+        _page = 1;
+    }
+
+    private void SetPriority(ChangeEventArgs args)
+    {
+        _priorityFilter = args.Value?.ToString() ?? string.Empty;
+        _page = 1;
+    }
+
+    private void OpenCreate()
+    {
+        _createError = null;
+        _newTask = new NewTaskModel();
+        _showCreate = true;
+    }
+
     private async Task AddTaskAsync()
     {
-        _actionError = null;
+        _createError = null;
         _adding = true;
 
         var request = new CreateTaskRequest(
@@ -232,11 +344,17 @@ else
         if (result.IsSuccess)
         {
             _tasks.Add(result.Value);
-            _newTask = new NewTaskModel();
+            _showCreate = false;
+
+            // Makes sure the new task is visible even if a filter would have hidden it.
+            _statusTab = "active";
+            _priorityFilter = string.Empty;
+            _search = string.Empty;
+            _page = Paging.TotalPages(FilteredTasks.Count);
         }
         else
         {
-            _actionError = result.Error;
+            _createError = result.Error;
         }
     }
 
@@ -261,23 +379,36 @@ else
         }
     }
 
-    private async Task DeleteTaskAsync(TaskDto task)
+    private void AskDelete(TaskDto task)
     {
-        _actionError = null;
+        _deleteError = null;
+        _deleteTarget = task;
+    }
+
+    private async Task DeleteTaskAsync()
+    {
+        if (_deleteTarget is not { } task)
+        {
+            return;
+        }
+
+        _deleteError = null;
+        _deleting = true;
         _busyTaskIds.Add(task.Id);
 
         var result = await TasksApi.DeleteAsync(task.Id);
 
         _busyTaskIds.Remove(task.Id);
-        _confirmDeleteId = null;
+        _deleting = false;
 
         if (result.IsSuccess)
         {
             _tasks.RemoveAll(t => t.Id == task.Id);
+            _deleteTarget = null;
         }
         else
         {
-            _actionError = result.Error;
+            _deleteError = result.Error;
         }
     }
 
@@ -289,16 +420,6 @@ else
             _tasks[index] = task;
         }
     }
-
-    private static string StatusLabel(TaskItemStatus status) =>
-        status == TaskItemStatus.InProgress ? "In progress" : status.ToString();
-
-    private static string PriorityClass(TaskPriority priority) => priority switch
-    {
-        TaskPriority.High => "bg-danger",
-        TaskPriority.Medium => "bg-warning text-dark",
-        _ => "bg-secondary"
-    };
 
     private sealed class NewTaskModel
     {

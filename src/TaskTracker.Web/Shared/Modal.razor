@@ -1,0 +1,64 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (Open)
+{
+    <dialog @ref="_dialog" class="app-modal" aria-labelledby="@_titleId">
+        <div class="modal-head">
+            <h2 id="@_titleId">@Title</h2>
+            <button type="button" class="icon-button" aria-label="Close" disabled="@Busy" @onclick="RequestClose">
+                <Icon Name="x" />
+            </button>
+        </div>
+        <div class="modal-body">
+            @ChildContent
+        </div>
+    </dialog>
+}
+
+@code {
+    private readonly string _titleId = $"modal-{Guid.NewGuid():N}";
+    private ElementReference _dialog;
+    private DotNetObjectReference<Modal>? _reference;
+    private bool _isShown;
+
+    [Parameter]
+    public bool Open { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    // Prevents closing while a save is in progress, so its result is not lost.
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [JSInvokable]
+    public Task RequestClose() => Busy ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open && !_isShown)
+        {
+            _isShown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("taskTrackerDialog.open", _dialog, _reference);
+        }
+        else if (!Open && _isShown)
+        {
+            _isShown = false;
+            await JS.InvokeVoidAsync("taskTrackerDialog.restoreFocus");
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _reference?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

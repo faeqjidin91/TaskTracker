@@ -1,98 +1,140 @@
 @inject ProjectApiClient ProjectsApi
 
-<section class="card mb-4" aria-label="Project members">
-    <div class="card-body">
-        <h2 class="h5 card-title">Members</h2>
-
-        @if (_error is not null)
+<section aria-label="Project members">
+    <div class="section-head">
+        <h2>Members</h2>
+        @if (Project.Permissions.CanManageMembers)
         {
-            <div class="alert alert-danger" role="alert">@_error</div>
-        }
-
-        <div class="list-group mb-3">
-            <div class="list-group-item d-flex justify-content-between align-items-center gap-2" data-testid="project-owner">
-                <span class="text-break">@Project.OwnerEmail</span>
-                <span class="badge bg-primary">Owner</span>
-            </div>
-
-            @if (_loading)
-            {
-                <div class="list-group-item"><LoadingSpinner /></div>
-            }
-
-            @foreach (var member in _members)
-            {
-                <div @key="member.UserId" class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <span class="text-break">@member.Email</span>
-                    @if (Project.Permissions.CanManageMembers)
-                    {
-                        <span class="d-flex gap-2">
-                            <select class="form-select form-select-sm w-auto" aria-label="Project role for @member.Email"
-                                    value="@member.Role.ToString()" disabled="@_busy"
-                                    @onchange="e => ChangeRoleAsync(member, e)">
-                                @foreach (var role in Enum.GetValues<ProjectRole>())
-                                {
-                                    <option value="@role.ToString()">@role</option>
-                                }
-                            </select>
-                            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy"
-                                    aria-label="Remove @member.Email" @onclick="() => RemoveAsync(member)">Remove</button>
-                        </span>
-                    }
-                    else
-                    {
-                        <span class="badge bg-light text-dark border">@member.Role</span>
-                    }
-                </div>
-            }
-        </div>
-
-        @if (Project.Permissions.CanManageMembers && !_loading)
-        {
-            @if (Available.Count == 0)
-            {
-                <p class="text-muted small mb-0">Everyone in your organization is already on this project.</p>
-            }
-            else
-            {
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label" for="member-user">Add member</label>
-                        <select id="member-user" class="form-select" @bind="_selectedUserId">
-                            <option value="">Select a user</option>
-                            @foreach (var candidate in Available)
-                            {
-                                <option value="@candidate.UserId">@candidate.Email</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-7 col-md-3">
-                        <label class="form-label" for="member-role">Role</label>
-                        <select id="member-role" class="form-select" @bind="_selectedRole">
-                            @foreach (var role in Enum.GetValues<ProjectRole>())
-                            {
-                                <option value="@role">@role</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-5 col-md-3">
-                        <button type="button" class="btn btn-primary w-100"
-                                disabled="@(_busy || string.IsNullOrEmpty(_selectedUserId))" @onclick="AddAsync">Add member</button>
-                    </div>
-                </div>
-            }
+            <button type="button" class="btn btn-primary" disabled="@(_loading || Available.Count == 0)"
+                    title="@(Available.Count == 0 ? "Everyone in your organization is already on this project" : null)"
+                    @onclick="OpenAdd">
+                <Icon Name="plus" /> Add member
+            </button>
         }
     </div>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+
+    <div class="table-card">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th scope="col">User</th>
+                        <th scope="col">Role</th>
+                        @if (Project.Permissions.CanManageMembers)
+                        {
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr data-testid="project-owner">
+                        <td class="cell-title">@Project.OwnerEmail</td>
+                        <td><span class="pill pill-success">Owner</span></td>
+                        @if (Project.Permissions.CanManageMembers)
+                        {
+                            <td></td>
+                        }
+                    </tr>
+                    @if (_loading)
+                    {
+                        <tr><td colspan="3"><LoadingSpinner /></td></tr>
+                    }
+                    @foreach (var member in _members)
+                    {
+                        <tr @key="member.UserId">
+                            <td>@member.Email</td>
+                            <td>
+                                @if (Project.Permissions.CanManageMembers)
+                                {
+                                    <select class="form-select form-select-sm" aria-label="Project role for @member.Email"
+                                            value="@member.Role.ToString()" disabled="@_busy"
+                                            @onchange="e => ChangeRoleAsync(member, e)">
+                                        @foreach (var role in Enum.GetValues<ProjectRole>())
+                                        {
+                                            <option value="@role.ToString()">@role</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <span class="pill @(member.Role == ProjectRole.Contributor ? "pill-info" : null)">@member.Role</span>
+                                }
+                            </td>
+                            @if (Project.Permissions.CanManageMembers)
+                            {
+                                <td class="cell-actions">
+                                    <button type="button" class="icon-button danger" disabled="@_busy" title="Remove member"
+                                            aria-label="Remove @member.Email" @onclick="() => _removeTarget = member">
+                                        <Icon Name="trash" Size="16" />
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 </section>
+
+<Modal Open="_showAdd" Title="Add member" Busy="_busy" OnClose="() => _showAdd = false">
+    @if (_addError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_addError</div>
+    }
+    <div class="mb-3">
+        <label class="form-label" for="member-user">User</label>
+        <select id="member-user" class="form-select" @bind="_selectedUserId">
+            <option value="">Select a user</option>
+            @foreach (var candidate in Available)
+            {
+                <option value="@candidate.UserId">@candidate.Email</option>
+            }
+        </select>
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="member-role">Role</label>
+        <select id="member-role" class="form-select" @bind="_selectedRole">
+            @foreach (var role in Enum.GetValues<ProjectRole>())
+            {
+                <option value="@role">@role</option>
+            }
+        </select>
+    </div>
+    <div class="modal-actions">
+        <button type="button" class="btn btn-outline-secondary" disabled="@_busy" @onclick="() => _showAdd = false">Cancel</button>
+        <button type="button" class="btn btn-primary" disabled="@(_busy || string.IsNullOrEmpty(_selectedUserId))" @onclick="AddAsync">
+            @(_busy ? "Adding..." : "Add to project")
+        </button>
+    </div>
+</Modal>
+
+<ConfirmDialog Open="_removeTarget is not null"
+               Title="Remove member"
+               Message="@($"Remove {_removeTarget?.Email} from this project?")"
+               ConfirmLabel="Remove member"
+               Busy="_busy"
+               Error="@_removeError"
+               OnConfirm="RemoveAsync"
+               OnCancel="CancelRemove" />
 
 @code {
     private List<ProjectMemberDto> _members = [];
     private List<ProjectCandidateDto> _candidates = [];
+    private ProjectMemberDto? _removeTarget;
     private string _selectedUserId = string.Empty;
     private ProjectRole _selectedRole = ProjectRole.Contributor;
     private bool _loading = true;
+    private bool _showAdd;
     private bool _busy;
     private string? _error;
+    private string? _addError;
+    private string? _removeError;
 
     [Parameter, EditorRequired]
     public ProjectDto Project { get; set; } = default!;
@@ -129,9 +171,17 @@
         _loading = false;
     }
 
+    private void OpenAdd()
+    {
+        _addError = null;
+        _selectedUserId = string.Empty;
+        _selectedRole = ProjectRole.Contributor;
+        _showAdd = true;
+    }
+
     private async Task AddAsync()
     {
-        _error = null;
+        _addError = null;
         _busy = true;
 
         var result = await ProjectsApi.AddMemberAsync(Project.Id, _selectedUserId, _selectedRole);
@@ -141,12 +191,11 @@
         {
             _members.Add(result.Value);
             _members = _members.OrderBy(m => m.Email, StringComparer.OrdinalIgnoreCase).ToList();
-            _selectedUserId = string.Empty;
-            _selectedRole = ProjectRole.Contributor;
+            _showAdd = false;
         }
         else
         {
-            _error = result.Error;
+            _addError = result.Error;
         }
     }
 
@@ -171,9 +220,20 @@
         }
     }
 
-    private async Task RemoveAsync(ProjectMemberDto member)
+    private void CancelRemove()
     {
-        _error = null;
+        _removeError = null;
+        _removeTarget = null;
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (_removeTarget is not { } member)
+        {
+            return;
+        }
+
+        _removeError = null;
         _busy = true;
 
         var result = await ProjectsApi.RemoveMemberAsync(Project.Id, member.UserId);
@@ -182,10 +242,11 @@
         if (result.IsSuccess)
         {
             _members.RemoveAll(m => m.UserId == member.UserId);
+            _removeTarget = null;
         }
         else
         {
-            _error = result.Error;
+            _removeError = result.Error;
         }
     }
 

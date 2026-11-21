@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TaskTracker.Contracts.Tasks;
 
 // Status is excluded: it changes only through UpdateTaskStatusRequest, so every status
@@ -5,5 +7,5 @@ namespace TaskTracker.Contracts.Tasks;
 public record UpdateTaskRequest(
     string Title,
     string? Description,
-    TaskPriority Priority,
+    [property: JsonRequired] TaskPriority Priority,
     DateTime? DueDateUtc);

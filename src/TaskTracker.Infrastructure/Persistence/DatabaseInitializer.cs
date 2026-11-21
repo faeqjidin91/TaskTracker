@@ -11,12 +11,13 @@ public static class DatabaseInitializer
         await using var scope = services.CreateAsyncScope();
 
         await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync(ct);
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDevelopmentAsync();
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedDevelopmentAsync(ct);
     }
 
-    public static async Task BootstrapSuperAdminAsync(this IServiceProvider services, string email, string password)
+    public static async Task BootstrapSuperAdminAsync(
+        this IServiceProvider services, string email, string password, CancellationToken ct = default)
     {
         await using var scope = services.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().BootstrapSuperAdminAsync(email, password);
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().BootstrapSuperAdminAsync(email, password, ct);
     }
 }

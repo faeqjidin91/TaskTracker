@@ -41,7 +41,7 @@ public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRe
 {
     public ChangePasswordRequestValidator()
     {
-        RuleFor(x => x.CurrentPassword).NotEmpty();
+        RuleFor(x => x.CurrentPassword).NotEmpty().MaximumLength(UserRules.PasswordMaxLength);
         RuleFor(x => x.NewPassword).NotEmpty().MaximumLength(UserRules.PasswordMaxLength);
     }
 }

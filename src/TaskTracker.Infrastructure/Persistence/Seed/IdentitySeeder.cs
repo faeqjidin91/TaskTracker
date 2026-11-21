@@ -14,9 +14,9 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, AppDbContext 
     private const string TestPassword = "Passw0rd!";
 
     // Development only: documented local accounts, with the demo projects owned by the Admin.
-    public async Task SeedDevelopmentAsync()
+    public async Task SeedDevelopmentAsync(CancellationToken ct)
     {
-        await EnsureSuperAdminAsync(TestSuperAdminEmail, TestPassword);
+        await EnsureSuperAdminAsync(TestSuperAdminEmail, TestPassword, ct);
 
         var admin = await userManager.FindByEmailAsync(TestAdminEmail);
         if (admin is null)
@@ -27,7 +27,7 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, AppDbContext 
         }
 
         var memberships = db.OrganizationMembers.IgnoreQueryFilters();
-        if (!await memberships.AnyAsync(m => m.UserId == admin.Id))
+        if (!await memberships.AnyAsync(m => m.UserId == admin.Id, ct))
         {
             db.OrganizationMembers.Add(new OrganizationMember
             {
@@ -35,34 +35,34 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, AppDbContext 
                 UserId = admin.Id,
                 Role = OrganizationRole.Admin
             });
-            await db.SaveChangesAsync();
+            await db.SaveChangesAsync(ct);
         }
 
         var demoProjects = await db.Projects
             .IgnoreQueryFilters()
             .Where(p => p.OwnerUserId == SeedIds.SystemUserId)
-            .ToListAsync();
+            .ToListAsync(ct);
 
         foreach (var project in demoProjects)
         {
             project.OwnerUserId = admin.Id;
         }
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(ct);
     }
 
     // Any environment: creates the first SuperAdmin from secrets, and only if none exists.
-    public async Task BootstrapSuperAdminAsync(string email, string password)
+    public async Task BootstrapSuperAdminAsync(string email, string password, CancellationToken ct)
     {
         if ((await userManager.GetUsersInRoleAsync(TokenClaims.SuperAdminRole)).Count > 0)
         {
             return;
         }
 
-        await EnsureSuperAdminAsync(email, password);
+        await EnsureSuperAdminAsync(email, password, ct);
     }
 
-    private async Task EnsureSuperAdminAsync(string email, string password)
+    private async Task EnsureSuperAdminAsync(string email, string password, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(email);
         if (user is null)
@@ -71,7 +71,7 @@ public class IdentitySeeder(UserManager<IdentityUser> userManager, AppDbContext 
             EnsureSucceeded(await userManager.CreateAsync(user, password));
             logger.LogInformation("Created SuperAdmin {Email}", email);
         }
-        else if (await db.OrganizationMembers.IgnoreQueryFilters().AnyAsync(m => m.UserId == user.Id))
+        else if (await db.OrganizationMembers.IgnoreQueryFilters().AnyAsync(m => m.UserId == user.Id, ct))
         {
             throw new InvalidOperationException($"{email} belongs to an organization and cannot be a SuperAdmin.");
         }

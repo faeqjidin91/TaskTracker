@@ -7,7 +7,8 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()
     {
-        RuleFor(x => x.Email).NotEmpty();
-        RuleFor(x => x.Password).NotEmpty();
+        // The limits stop oversized input from reaching the deliberately slow password hasher.
+        RuleFor(x => x.Email).NotEmpty().MaximumLength(UserRules.EmailMaxLength);
+        RuleFor(x => x.Password).NotEmpty().MaximumLength(UserRules.PasswordMaxLength);
     }
 }

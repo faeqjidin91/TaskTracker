@@ -177,6 +177,8 @@ Organization members who are not on a project cannot see it.
 - Admins cannot change their own role or status.
 - A project owner cannot be deactivated until ownership is transferred.
 - Deactivating an organization signs out all of its users.
+- Status, role, and priority fields are required, so an empty request body cannot demote or deactivate anything.
+- Two requests changing the same row return 409 rather than a server error.
 
 ## 5. External integration
 

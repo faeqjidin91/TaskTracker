@@ -35,6 +35,7 @@ Never add a reference that breaks this graph.
 - Controllers are thin: no DbContext in controllers; they call Application services.
 - All EF calls async with CancellationToken.
 - DTOs are `record` types in Contracts. Never return entities from the API.
+- Value-type request fields use `[property: JsonRequired]`, so a missing field is a 400, not a default.
 - Errors return RFC 7807 ProblemDetails. Status codes: 200, 201 + Location, 204, 400, 401, 403, 404, 409.
 - Every endpoint requires auth except login. This replaces the original anonymous-GET rule,
   because public reads would expose data across organizations.

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace TaskTracker.Api.Errors;
 
@@ -20,24 +21,46 @@ public sealed class GlobalExceptionHandler(
             return true;
         }
 
+        // Two requests changed the same row, such as a double delete. The client can retry.
+        if (exception is DbUpdateConcurrencyException)
+        {
+            logger.LogInformation(
+                "Concurrent update rejected for {Method} {Path}",
+                httpContext.Request.Method,
+                httpContext.Request.Path);
+
+            return await WriteProblemAsync(
+                httpContext,
+                exception,
+                StatusCodes.Status409Conflict,
+                "This item was changed or deleted by another request. Refresh and try again.",
+                detail: null);
+        }
+
         logger.LogError(
             exception,
             "Unhandled exception for {Method} {Path}",
             httpContext.Request.Method,
             httpContext.Request.Path);
 
-        httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        return await WriteProblemAsync(
+            httpContext,
+            exception,
+            StatusCodes.Status500InternalServerError,
+            "An unexpected error occurred.",
+            environment.IsDevelopment() ? exception.ToString() : null);
+    }
 
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
+    private ValueTask<bool> WriteProblemAsync(
+        HttpContext httpContext, Exception exception, int status, string title, string? detail)
+    {
+        httpContext.Response.StatusCode = status;
+
+        return problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "An unexpected error occurred.",
-                Detail = environment.IsDevelopment() ? exception.ToString() : null
-            }
+            ProblemDetails = new ProblemDetails { Status = status, Title = title, Detail = detail }
         });
     }
 }

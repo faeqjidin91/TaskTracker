@@ -16,7 +16,8 @@ Platform -> Organization -> Project -> Task
 | Data | EF Core with SQL Server 2022 in Docker |
 | Auth | ASP.NET Core Identity and JWT bearer tokens |
 | Validation | FluentValidation |
-| Notifications | Logging, database, or Azure Service Bus, selected by configuration |
+| Notifications | Local logging and database stubs, or Azure Service Bus, selected by configuration |
+| Containers | Docker Compose for SQL Server, API, and Web |
 | Tests | xUnit with SQLite in-memory and hand-written fakes |
 
 ## 2. Solution layout
@@ -31,19 +32,7 @@ Platform -> Organization -> Project -> Task
 | `src/TaskTracker.Web` | Contracts | Blazor WebAssembly UI. |
 | `tests/TaskTracker.Application.Tests` | Application, Domain | Application-layer tests. |
 
-```mermaid
-flowchart LR
-    Api[Api] --> Application[Application]
-    Api --> Infrastructure[Infrastructure]
-    Api --> Contracts[Contracts]
-    Infrastructure --> Application
-    Infrastructure --> Domain[Domain]
-    Application --> Domain
-    Application --> Contracts
-    Web[Web] --> Contracts
-    Tests[Application.Tests] --> Application
-    Tests --> Domain
-```
+![Project references: Api uses Application, Infrastructure, and Contracts. Infrastructure uses Application and Domain. Application uses Domain and Contracts. Web uses only Contracts. Application.Tests uses Application and Domain.](docs/diagrams/project-references.png)
 
 Why each split exists:
 
@@ -249,7 +238,7 @@ Organization members who are not on a project cannot see it.
 
 `TaskService.UpdateStatusAsync` publishes a `TaskStatusChangedEvent` through `INotificationPublisher`.
 
-- It publishes **after** the status change is saved, and only if the status actually changed.
+- It publishes **after** the status change is saved, and only if the status actually changed. Creating a task does not publish an event.
 - A publisher failure is caught and logged, and the request still succeeds.
 - `CompositeNotificationPublisher` sends to every configured provider, so one failing provider does not stop the others.
 - A crash between the save and the publish can lose an event. The **outbox pattern** is the next step: write the event in the same transaction and publish it from a background worker.
@@ -263,19 +252,15 @@ Providers are chosen entirely through `Notifications:Providers`. An unknown name
 | Development | `Logging`, `Database` | Structured log line and a `NotificationLog` row |
 | Production | `ServiceBus` | JSON message on the `task-events` topic |
 
+`Logging` and `Database` are local stubs that record the event without calling an external system, so local development needs no Azure account or emulator.
+
 ### Production architecture
 
 Solid arrows are implemented in this repository. **Dashed arrows are the proposed deployment and are not built here**, including the Azure Function and SendGrid email.
 
-```mermaid
-flowchart LR
-    Web["Blazor WebAssembly"] -->|"HTTPS + JWT"| Api["API on App Service<br/>Managed Identity"]
-    Api -->|"Azure Service Bus Data Sender role"| Topic[["Service Bus topic<br/>task-events"]]
-    Topic -.->|"ServiceBusTrigger"| Function["Azure Function"]
-    Function -.->|"Send email"| SendGrid["SendGrid"]
-    Api -.->|"Read JWT signing key"| KeyVault[("Key Vault")]
-    Function -.->|"Read SendGrid key"| KeyVault
-```
+![Production architecture: Blazor WebAssembly calls the API over HTTPS with a JWT, and the API sends to the Service Bus topic task-events. Proposed and not built: a Service Bus trigger runs an Azure Function that emails through SendGrid, and the API and Function read secrets from Key Vault.](docs/diagrams/production-architecture.png)
+
+The diagram sources are in [`docs/diagrams`](docs/diagrams).
 
 - The API authenticates to Service Bus with `DefaultAzureCredential` and the **Azure Service Bus Data Sender** RBAC role, so there is no connection string.
 - Key Vault holds the JWT signing key and SendGrid key.
@@ -330,7 +315,7 @@ if (builder.Configuration["KeyVault:Uri"] is { Length: > 0 } keyVaultUri)
 ### Completed
 
 - [x] Clean project separation with an enforced reference graph
-- [x] EF Core migrations and seed data
+- [x] EF Core migrations and environment-based seeding from `.env`
 - [x] REST API with DTOs, validation, ProblemDetails errors, and Swagger
 - [x] JWT authentication with immediate token revocation
 - [x] Organizations, SuperAdmin, organization roles, project owners, and project members
@@ -338,18 +323,20 @@ if (builder.Configuration["KeyVault:Uri"] is { Length: > 0 } keyVaultUri)
 - [x] Blazor UI for login, organizations, users, projects, members, tasks, and password change
 - [x] Pluggable notifications with failure isolation
 - [x] Application-layer tests on .NET 10 and .NET 8
+- [x] Docker images and Compose stack for .NET 10 or .NET 8
 
 ### Deferred
 
 - [ ] Outbox pattern for guaranteed notification delivery
 - [ ] Azure Function, SendGrid email, and Key Vault wiring
+- [ ] Health check endpoints for the database and Service Bus
 - [ ] Automated integration tests for real EF filters, Identity, and API policies
 - [ ] CI pipeline
 - [ ] Refresh tokens, and HttpOnly cookies instead of `localStorage`
 - [ ] Login rate limiting and lockout
 - [ ] Email invitations and forced change of temporary passwords
 - [ ] Assigning individual tasks to people
-- [ ] Pagination
+- [ ] Server-side pagination (the UI currently pages lists in the browser)
 - [ ] Users in multiple organizations, organization rename, and a SuperAdmin management screen
 
 ## 7. Design decisions and trade-offs

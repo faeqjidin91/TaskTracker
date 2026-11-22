@@ -1,0 +1,7 @@
+flowchart LR
+    Web["Blazor<br/>WebAssembly"] -->|"HTTPS<br/>+ JWT"| Api["API on<br/>App Service<br/>Managed Identity"]
+    Api -->|"Service Bus<br/>Data Sender"| Topic[["Service Bus topic<br/>task-events"]]
+    Topic -.->|"Service Bus<br/>trigger"| Function["Azure<br/>Function"]
+    Function -.->|"Send<br/>email"| SendGrid["SendGrid"]
+    Api -.->|"Read JWT signing key"| KeyVault[("Key Vault")]
+    Function -.->|"Read<br/>SendGrid key"| KeyVault

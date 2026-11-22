@@ -1,0 +1,11 @@
+flowchart TB
+    Web[Web] --> Contracts[Contracts]
+    Api[Api] --> Infrastructure[Infrastructure]
+    Api --> Application[Application]
+    Api --> Contracts
+    Tests[Application.Tests] --> Application
+    Tests --> Domain[Domain]
+    Infrastructure --> Application
+    Infrastructure --> Domain
+    Application --> Domain
+    Application --> Contracts

@@ -191,7 +191,7 @@ With the values from `.env.example`, the local accounts are:
 
 ### Who can do what
 
-Every endpoint except login requires a token.
+Every endpoint except login and the [health checks](#health-checks) requires a token.
 
 Organization-level actions:
 
@@ -253,6 +253,19 @@ Providers are chosen entirely through `Notifications:Providers`. An unknown name
 | Production | `ServiceBus` | JSON message on the `task-events` topic |
 
 `Logging` and `Database` are local stubs that record the event without calling an external system, so local development needs no Azure account or emulator.
+
+### Health checks
+
+| Endpoint | Checks | Response |
+|---|---|---|
+| `GET /health/live` | The API process only | `200 Healthy` |
+| `GET /health/ready` | SQL Server, plus Service Bus when that provider is enabled | `200 Healthy`, `200 Degraded`, or `503 Unhealthy` |
+
+- A database failure is **Unhealthy**, because the API cannot serve requests without it.
+- A Service Bus failure is **Degraded**, because notification failures never fail the main request.
+- The Service Bus check opens a send link without sending a message, so the Data Sender role is enough.
+- Each check times out after 5 seconds.
+- Probes cannot send a JWT, so these endpoints are public. They return only the overall status, and failure details go to the server logs.
 
 ### Production architecture
 
@@ -322,6 +335,7 @@ if (builder.Configuration["KeyVault:Uri"] is { Length: > 0 } keyVaultUri)
 - [x] Tenant isolation in queries and database constraints
 - [x] Blazor UI for login, organizations, users, projects, members, tasks, and password change
 - [x] Pluggable notifications with failure isolation
+- [x] Health checks for the database and Service Bus
 - [x] Application-layer tests on .NET 10 and .NET 8
 - [x] Docker images and Compose stack for .NET 10 or .NET 8
 
@@ -329,7 +343,6 @@ if (builder.Configuration["KeyVault:Uri"] is { Length: > 0 } keyVaultUri)
 
 - [ ] Outbox pattern for guaranteed notification delivery
 - [ ] Azure Function, SendGrid email, and Key Vault wiring
-- [ ] Health check endpoints for the database and Service Bus
 - [ ] Automated integration tests for real EF filters, Identity, and API policies
 - [ ] CI pipeline
 - [ ] Refresh tokens, and HttpOnly cookies instead of `localStorage`

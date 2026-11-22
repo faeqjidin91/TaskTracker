@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using TaskTracker.Application.Abstractions;
 using TaskTracker.Infrastructure.Auth;
+using TaskTracker.Infrastructure.Health;
 using TaskTracker.Infrastructure.Notifications;
 using TaskTracker.Infrastructure.Persistence;
 using TaskTracker.Infrastructure.Persistence.Seed;
@@ -29,6 +31,11 @@ public static class DependencyInjection
 
         services.AddTokenAuthentication(configuration);
         services.AddNotifications(configuration);
+        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>(
+            "database",
+            HealthStatus.Unhealthy,
+            [HealthCheckSettings.ReadyTag],
+            HealthCheckSettings.Timeout);
 
         return services;
     }

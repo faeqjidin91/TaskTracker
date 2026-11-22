@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using TaskTracker.Infrastructure.Health;
 using TaskTracker.Infrastructure.Persistence;
 using TaskTracker.Infrastructure.Persistence.Seed;
 
@@ -39,7 +41,20 @@ public static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
+        app.MapHealthEndpoints();
 
         return app;
+    }
+
+    // Probes cannot send a JWT, so these are public and return only the overall status.
+    private static void MapHealthEndpoints(this WebApplication app)
+    {
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false })
+            .AllowAnonymous();
+
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains(HealthCheckSettings.ReadyTag)
+        }).AllowAnonymous();
     }
 }

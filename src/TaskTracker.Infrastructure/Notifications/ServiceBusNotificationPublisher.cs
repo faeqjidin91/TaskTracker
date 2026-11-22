@@ -44,6 +44,12 @@ public sealed class ServiceBusNotificationPublisher : INotificationPublisher, IA
         await _sender.SendMessageAsync(message, ct);
     }
 
+    // Opens the send link without sending, so the Data Sender role is enough.
+    public async Task CheckConnectionAsync(CancellationToken ct)
+    {
+        using var batch = await _sender.CreateMessageBatchAsync(ct);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _sender.DisposeAsync();

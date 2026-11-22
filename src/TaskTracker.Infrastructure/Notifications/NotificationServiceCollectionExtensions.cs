@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using TaskTracker.Application.Abstractions;
+using TaskTracker.Infrastructure.Health;
 
 namespace TaskTracker.Infrastructure.Notifications;
 
@@ -33,6 +35,11 @@ public static class NotificationServiceCollectionExtensions
         if (providerTypes.Contains(typeof(ServiceBusNotificationPublisher)))
         {
             ValidateServiceBus(options.ServiceBus);
+            services.AddHealthChecks().AddCheck<ServiceBusHealthCheck>(
+                "service-bus",
+                HealthStatus.Degraded,
+                [HealthCheckSettings.ReadyTag],
+                HealthCheckSettings.Timeout);
         }
 
         foreach (var providerType in providerTypes)

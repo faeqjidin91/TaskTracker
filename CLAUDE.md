@@ -38,8 +38,9 @@ Never add a reference that breaks this graph.
 - DTOs are `record` types in Contracts. Never return entities from the API.
 - Value-type request fields use `[property: JsonRequired]`, so a missing field is a 400, not a default.
 - Errors return RFC 7807 ProblemDetails. Status codes: 200, 201 + Location, 204, 400, 401, 403, 404, 409.
-- Every endpoint requires auth except login. This replaces the original anonymous-GET rule,
-  because public reads would expose data across organizations.
+- Every endpoint requires auth except login and the status-only `/health/live` and `/health/ready`,
+  which probes call without a JWT. This replaces the original anonymous-GET rule, because public
+  reads would expose data across organizations.
 - Hierarchy: Platform -> Organization -> Project -> Task. Each user belongs to one organization.
 - SuperAdmin is the only global role. It manages organizations and cannot read their data.
 - Organization roles: Admin, Member. Project roles: owner (Project.OwnerUserId), Contributor, Viewer.

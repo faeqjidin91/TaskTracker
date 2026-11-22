@@ -152,12 +152,12 @@ The script builds `tasktracker-api` and `tasktracker-web`, and generates `JWT_SI
 | API | http://localhost:8091 |
 | Swagger | http://localhost:8091/swagger |
 
-Change the ports with `WEB_PORT` and `API_PORT` in `.env`. Script options:
+Change the ports with `WEB_PORT` and `API_PORT` in `.env`. Set `DOTNET_TFM=net8.0` in `.env` to build for .NET 8, then rebuild the images. The default is `net10.0`. Script options override `.env` for that run:
 
 | PowerShell | Bash | Purpose |
 |---|---|---|
-| `-Framework net8.0` | `--framework net8.0` | Build for .NET 8 instead of .NET 10 |
-| `-Tag v1` | `--tag v1` | Set the image tag |
+| `-Framework net8.0` | `--framework net8.0` | Choose the .NET version |
+| `-Tag v1` | `--tag v1` | Set the image tag, which otherwise comes from `IMAGE_TAG` or is `latest` |
 | `-NoCache` | `--no-cache` | Rebuild every layer |
 | `-Up` | `--up` | Start the stack after building |
 

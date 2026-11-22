@@ -5,8 +5,9 @@
 #   ./scripts/docker-build.sh --framework net8.0 --tag net8 --no-cache
 set -euo pipefail
 
-framework=net10.0
-tag=latest
+# These default to DOTNET_TFM and IMAGE_TAG in .env, then net10.0 and latest.
+framework=
+tag=
 no_cache=()
 start=false
 
@@ -25,16 +26,6 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-case "$framework" in
-    net10.0|net8.0) ;;
-    *) echo "Framework must be net10.0 or net8.0."; exit 2 ;;
-esac
-
-if ! [[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
-    echo "Invalid image tag: $tag"
-    exit 2
-fi
-
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 env_value() {
@@ -47,6 +38,18 @@ if [ ! -f .env ]; then
     cp .env.example .env
     echo "Created .env from .env.example. Set MSSQL_SA_PASSWORD in it, then run this script again."
     exit 1
+fi
+
+framework="${framework:-$(env_value DOTNET_TFM net10.0)}"
+case "$framework" in
+    net10.0|net8.0) ;;
+    *) echo "Framework must be net10.0 or net8.0."; exit 2 ;;
+esac
+
+tag="${tag:-$(env_value IMAGE_TAG latest)}"
+if ! [[ "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+    echo "Invalid image tag: $tag"
+    exit 2
 fi
 
 sa_password=$(env_value MSSQL_SA_PASSWORD)
@@ -68,7 +71,6 @@ if [ -z "$(env_value JWT_SIGNING_KEY)" ]; then
 fi
 
 export DOTNET_TFM="$framework"
-export DOTNET_VERSION="${framework#net}"
 export IMAGE_TAG="$tag"
 
 echo "Building tasktracker-api:$tag and tasktracker-web:$tag for $framework..."

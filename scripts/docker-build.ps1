@@ -10,11 +10,13 @@
 #>
 [CmdletBinding()]
 param(
+    # Defaults to DOTNET_TFM in .env, then net10.0.
     [ValidateSet('net10.0', 'net8.0')]
-    [string]$Framework = 'net10.0',
+    [string]$Framework,
 
+    # Defaults to IMAGE_TAG in .env, then latest.
     [ValidatePattern('^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$')]
-    [string]$Tag = 'latest',
+    [string]$Tag,
 
     # Rebuilds every layer.
     [switch]$NoCache,
@@ -51,6 +53,19 @@ try {
     }
 
     $lines = @(Get-Content $envPath)
+
+    $targetFramework = if ($Framework) { $Framework } else { Get-EnvValue $lines 'DOTNET_TFM' 'net10.0' }
+    if ($targetFramework -cnotin @('net10.0', 'net8.0')) {
+        Write-Host 'DOTNET_TFM must be net10.0 or net8.0.'
+        exit 2
+    }
+
+    $imageTag = if ($Tag) { $Tag } else { Get-EnvValue $lines 'IMAGE_TAG' 'latest' }
+    if ($imageTag -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$') {
+        Write-Host "Invalid image tag: $imageTag"
+        exit 2
+    }
+
     $saPassword = Get-EnvValue $lines 'MSSQL_SA_PASSWORD' ''
     if (-not $saPassword -or $saPassword -eq 'change-me') {
         Write-Host 'Set a strong MSSQL_SA_PASSWORD in .env, then run this script again.'
@@ -74,11 +89,10 @@ try {
         Write-Host 'Generated JWT_SIGNING_KEY in .env.'
     }
 
-    $env:DOTNET_TFM = $Framework
-    $env:DOTNET_VERSION = $Framework -replace '^net', ''
-    $env:IMAGE_TAG = $Tag
+    $env:DOTNET_TFM = $targetFramework
+    $env:IMAGE_TAG = $imageTag
 
-    Write-Host "Building tasktracker-api:$Tag and tasktracker-web:$Tag for $Framework..."
+    Write-Host "Building tasktracker-api:$imageTag and tasktracker-web:$imageTag for $targetFramework..."
     $buildArgs = @('compose', 'build')
     if ($NoCache) { $buildArgs += '--no-cache' }
     $buildArgs += @('api', 'web')

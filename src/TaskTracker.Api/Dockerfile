@@ -1,8 +1,11 @@
 # Build from the repository root: docker build -f src/TaskTracker.Api/Dockerfile .
-ARG DOTNET_VERSION=10.0
+ARG DOTNET_TFM=net10.0
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime-net10.0
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime-net8.0
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG DOTNET_TFM=net10.0
+ARG DOTNET_TFM
 WORKDIR /src
 
 # Project files are copied first, so package restore stays cached until they change.
@@ -22,7 +25,7 @@ COPY src/TaskTracker.Api/ src/TaskTracker.Api/
 RUN dotnet publish src/TaskTracker.Api/TaskTracker.Api.csproj -c Release -f ${DOTNET_TFM} \
     -p:TargetFrameworks=${DOTNET_TFM} -p:UseAppHost=false --no-restore -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
+FROM runtime-${DOTNET_TFM} AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=8080

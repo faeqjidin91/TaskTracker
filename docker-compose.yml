@@ -23,7 +23,6 @@ services:
       dockerfile: src/TaskTracker.Api/Dockerfile
       args:
         DOTNET_TFM: ${DOTNET_TFM:-net10.0}
-        DOTNET_VERSION: ${DOTNET_VERSION:-10.0}
     container_name: tasktracker-api
     depends_on:
       sqlserver:

@@ -7,6 +7,9 @@ public sealed class TaskApiClient(HttpClient http) : ApiClientBase(http)
     public Task<ApiResult<List<TaskDto>>> GetByProjectAsync(int projectId) =>
         GetAsync<List<TaskDto>>($"api/projects/{projectId}/tasks");
 
+    public Task<ApiResult<TaskDto>> GetByIdAsync(int id) =>
+        GetAsync<TaskDto>($"api/tasks/{id}");
+
     public Task<ApiResult<TaskDto>> CreateAsync(int projectId, CreateTaskRequest request) =>
         PostAsync<CreateTaskRequest, TaskDto>($"api/projects/{projectId}/tasks", request);
 

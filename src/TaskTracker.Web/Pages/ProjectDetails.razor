@@ -370,12 +370,22 @@ else
         ReplaceTask(task with { Status = status });
 
         var result = await TasksApi.UpdateStatusAsync(task.Id, status);
-        _busyTaskIds.Remove(task.Id);
 
         if (!result.IsSuccess)
         {
+            _busyTaskIds.Remove(task.Id);
             ReplaceTask(task);
             _actionError = result.Error;
+            return;
+        }
+
+        // The update returns no body, so reload the task to show the server's Updated time.
+        var refreshed = await TasksApi.GetByIdAsync(task.Id);
+        _busyTaskIds.Remove(task.Id);
+
+        if (refreshed.IsSuccess)
+        {
+            ReplaceTask(refreshed.Value);
         }
     }
 
